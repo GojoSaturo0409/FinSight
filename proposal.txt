@@ -1,0 +1,104 @@
+FinSight: A Personal Finance Management Platform
+Project 3 Proposal
+Team 06: 2022113009, 2022113003, 2023101111, 2023101115, 2023101079
+
+1
+
+Description of the Use Case
+
+Young professionals, students, and gig workers often earn money from different sources while spending
+on rent, subscriptions, food, and utilities. Many existing tools are either too manual, like spreadsheets,
+or require expensive subscriptions. FinSight is a web-based finance dashboard that collects transactions
+from multiple sources, automatically categorises spending, sends budget alerts, and suggests ways to
+save through a React interface.
+The main users are people aged 18–35 who want a clearer view of their spending. The problem is that
+many people only realise where their money goes after they have already exceeded their budget. Getting
+timely and automated insights can help them notice this earlier and manage their money better.
+
+2
+
+Key Functionalities, APIs, and Architecture
+
+The prototype implements three end-to-end features: multi-source transaction ingestion and normalisation, real-time budget tracking with alerts, and an analytics dashboard with a savings recommendation
+engine. These three flows together exercise all six design patterns and all external APIs.
+Five freely available APIs are used. The Plaid API (free developer sandbox, no credit card required) is
+the primary bank data source; its /transactions/sync endpoint feeds PlaidAdapter, which converts
+Plaid’s JSON into the internal Transaction object. Currency conversion is handled by ExchangeRateAPI (1,500 free requests per month). If it returns a rate-limit error, the system falls over to Open
+Exchange Rates (1,000 free requests per month), and if both fail, a cached daily rate in PostgreSQL
+acts as the terminal fallback. Email alerts go through Mailjet (200 free emails per day, no credit card),
+with the EmailNotifier calling the /v3.1/send endpoint. Push notifications are sent via Firebase
+Cloud Messaging, which is free for standard usage. Investment data for the portfolio panel comes from
+Alpha Vantage (25 free requests per day via TIME SERIES DAILY), with results cached in the database
+to stay within the limit.
+The Factory pattern sits at the ingestion entry point as TransactionFactory. It inspects the input source and instantiates the right parser, PlaidParser, BankCSVParser, or ManualEntryParser,
+without the controller knowing which one is used. New formats require only a new subclass.
+The Adapter pattern converts external schemas into the internal domain model. Plaid returns nested
+JSON; CSV uploads are flat row maps. PlaidAdapter and CSVAdapter both implement ITransactionSource and produce a uniform Transaction object carrying id, amount, currency, category,
+merchant, date, and source. Everything downstream works with this object regardless of where the
+data came from.
+The Observer pattern runs the alert system. BudgetMonitor holds a list of observers: EmailNotifier
+using Mailjet, InAppNotifier using Firebase, and a LoggingObserver for the audit log. When spending crosses a threshold, notifyAll() fires and each observer handles its own delivery. Adding a new
+channel means registering one new class.
+The Strategy pattern controls transaction categorisation in CategorizationService. RuleBasedStrategy uses a keyword dictionary and runs with low latency. MLStrategy loads a Naive Bayes
+classifier from a pickle file for better accuracy. A flag in the config file selects which one is active at
+startup, so the algorithm can be swapped without touching the service interface.
+The Chain of Responsibility pattern appears in two places. The recommendation engine sends the
+monthly summary through four handlers: HighSpendDetector flags categories above 30% of income,
+SubscriptionAuditHandler finds redundant recurring charges, SavingsGoalAdvisor checks progress
+1
+
+against targets, and InvestmentOpportunityHandler suggests low-risk investment instruments when
+a monthly surplus exists. Market data for suggested instruments is retrieved from Alpha Vantage to
+display current prices and trends. A separate chain handles currency API fallback across ExchangeRateAPI, Open Exchange Rates, and the database cache.
+The Builder pattern constructs the monthly report through a fluent interface: ReportBuilder chained
+with withHeader, withDateRange, withSpendingPieChart, withCategoryBreakdownTable, withRecommendations, withNetWorthTrend, and build(). Each step is optional and independently testable.
+The system follows a three-tier architecture. The presentation layer is a React 18 SPA with TailwindCSS
+containing the Plaid OAuth widget, Chart.js charts, a transaction table, and budget sliders. The service
+layer is FastAPI with five routes: ingestion runs Factory and Adapter; budget evaluation fires the
+Observer chain; categorisation invokes the Strategy; recommendations run the Chain of Responsibility;
+and report generation runs the Builder. The data layer is PostgreSQL 15 accessed via SQLAlchemy,
+with JWT and OAuth2 for authentication. The stack runs in Docker Compose for local development.
+
+3
+
+Expected Time to Build a Prototype
+
+The prototype is built over thirty days. Two developers work on parallel vertical slices and the remaining
+three team members contribute during research, testing, and demo preparation.
+• Days 1 to 3: Cover research and planning. The team locks the feature scope, obtains free API
+credentials for all five services, finalises the database schema, sets up the GitHub repository, and
+configures a CI pipeline with GitHub Actions.
+• Days 4 to 6: Cover design. Both developers produce the architecture diagram, the OpenAPI
+contract for all five routes, wireframes for the main screens, and a working Docker Compose
+skeleton. Interface conventions for the Observer and Strategy components are agreed before any
+feature code is written.
+• Days 7 to 13: Cover backend development. Developer 1 builds the Plaid OAuth flow, TransactionFactory, both adapters, Alembic migrations, and JWT middleware. Developer 2 builds
+BudgetMonitor with all three observers and both categorisation strategies. Each stream is unittested before the two are merged.
+• Days 14 to 20: Cover frontend and analytics. Developer 1 builds the recommendation pipeline,
+the ReportBuilder chain, and the Alpha Vantage panel with database caching. Developer 2
+builds the React dashboard with charts, the transaction table, the budget slider panel, and
+Firebase toast notifications.
+• Days 21 to 23: Cover integration. The frontend and backend are connected through the API
+contract, the Plaid sandbox flow is validated end to end, and the currency fallback chain is tested
+by mocking rate-limit responses from the primary API.
+• Days 24 to 27: Cover testing. Unit tests cover every pattern boundary using mock injection.
+Integration tests run across all three flows with five Plaid sandbox datasets. One additional team
+member helps with test data and bug reporting.
+• Days 28 to 30: Cover refinement and demo preparation. Remaining bugs are fixed, the interface
+is polished, a short demo is recorded, and the submission is packaged.
+
+4
+
+Domain
+
+The domain is personal finance. The market for personal finance software is growing steadily, yet a
+large share of users still track spending manually or not at all. Research consistently shows that limited
+visibility into monthly discretionary spend is a direct contributor to missed savings goals. FinSight
+makes open-banking data and automated analytics available without a subscription fee.
+The finance domain also gives every architectural decision a practical justification. Plaid rate limits
+require caching at the adapter layer. The need to avoid storing bank credentials drives the OAuth tokenexchange design. The unreliability of free-tier currency APIs makes the fallback chain a necessity. The
+daily cap on Alpha Vantage requests requires database caching of responses. These constraints are not
+artificial; they are real production concerns that the architecture handles directly.
+2
+
+
