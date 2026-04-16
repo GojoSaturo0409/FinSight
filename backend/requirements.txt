@@ -6,3 +6,6 @@ pydantic==2.6.4
 pydantic-settings==2.2.1
 python-jose==3.3.0
 passlib==1.7.4
+python-multipart==0.0.9
+alembic==1.13.1
+plaid-python==15.0.0

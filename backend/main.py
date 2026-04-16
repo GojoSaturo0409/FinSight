@@ -11,6 +11,7 @@ from categorization.router import router as categorization_router
 from budget.router import router as budget_router
 from recommendations.router import router as recommendations_router
 from reports.router import router as reports_router
+from auth.router import router as auth_router
 
 app = FastAPI(title="FinSight API", version="1.0.0")
 
@@ -27,6 +28,7 @@ app.include_router(categorization_router, prefix="/categorization", tags=["Categ
 app.include_router(budget_router, prefix="/budget", tags=["Budget"])
 app.include_router(recommendations_router, prefix="/recommendations", tags=["Recommendations"])
 app.include_router(reports_router, prefix="/reports", tags=["Reports"])
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 
 @app.get("/")
 def read_root():
