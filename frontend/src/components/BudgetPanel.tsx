@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const BudgetPanel = () => {
     const [foodBudget, setFoodBudget] = useState(500);

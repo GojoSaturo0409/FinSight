@@ -1,4 +1,3 @@
-import React from 'react';
 
 const TransactionTable = ({ transactions }: { transactions: any[] }) => {
     return (

@@ -36,4 +36,5 @@ class InvestmentCache(Base):
     symbol = Column(String, unique=True, index=True)
     price = Column(Float, nullable=False)
     trend = Column(String) # e.g., 'up', 'down'
+    daily_prices = Column(String) # JSON-encoded time series for chart rendering
     last_updated = Column(DateTime, default=datetime.datetime.utcnow)
