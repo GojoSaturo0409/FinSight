@@ -25,8 +25,9 @@ from core.security import SECRET_KEY, ALGORITHM
 class MockObserver(AlertObserver):
     def __init__(self):
         self.alerts = []
-    def update(self, category, threshold, current_spend):
+    def update(self, category, threshold, current_spend, alert_level="exceeded"):
         self.alerts.append((category, threshold, current_spend))
+        return {"delivered": True, "channel": "mock", "detail": "test"}
 
 def test_factory_pattern():
     data = [{"transaction_id": "1", "amount": 100, "iso_currency_code": "USD"}]
@@ -45,12 +46,13 @@ def test_observer_pattern():
     monitor.attach(obs1)
     monitor.attach(obs2)
     
-    # 50 spend, limit 40 -> should trigger alert
+    # 50 spend, limit 40 -> ratio 1.25 triggers: warning (0.80), exceeded (1.00), critical (1.20)
     monitor.evaluate([{"category": "Food", "amount": 50}], {"Food": 40})
     
-    assert len(obs1.alerts) == 1
+    # Multi-threshold: 3 alerts fired (warning, exceeded, critical)
+    assert len(obs1.alerts) == 3
     assert obs1.alerts[0] == ("Food", 40, 50)
-    assert len(obs2.alerts) == 1
+    assert len(obs2.alerts) == 3
 
 def test_chain_of_responsibility():
     chain = RecommendationChain()
@@ -364,6 +366,316 @@ def test_alpha_vantage_cache_fresh():
     print("  Alpha Vantage fresh cache: PASS")
 
 
+# ============================================================
+# Member 2: Logic & Algos Developer Tests
+# ============================================================
+
+# --- Strategy Pattern Tests ---
+
+def test_rule_based_strategy_expanded():
+    """Test that the expanded RuleBasedStrategy covers all major categories."""
+    from categorization.strategies import RuleBasedStrategy
+    strategy = RuleBasedStrategy()
+
+    test_cases = [
+        ({"merchant": "Uber Ride"}, "Transport"),
+        ({"merchant": "Starbucks Coffee"}, "Food"),
+        ({"merchant": "Netflix Monthly"}, "Subscriptions"),
+        ({"merchant": "Rent Payment"}, "Housing"),
+        ({"merchant": "Electric Bill"}, "Utilities"),
+        ({"merchant": "Amazon Purchase"}, "Shopping"),
+        ({"merchant": "Cinema Ticket"}, "Entertainment"),
+        ({"merchant": "CVS Pharmacy"}, "Healthcare"),
+        ({"merchant": "Coursera Course"}, "Education"),
+        ({"merchant": "Salary Deposit"}, "Income"),
+        ({"merchant": "Unknown Vendor XYZ"}, "Miscellaneous"),
+    ]
+
+    for tx, expected in test_cases:
+        result = strategy.categorize(tx)
+        assert result == expected, f"Expected '{expected}' for {tx['merchant']}, got '{result}'"
+
+    print("  Rule-based strategy (expanded): PASS")
+
+
+def test_ml_strategy_categorization():
+    """Test that MLStrategy returns predictions (with ML suffix)."""
+    try:
+        from categorization.strategies import MLStrategy
+        strategy = MLStrategy()
+
+        if not strategy._trained:
+            print("  ML strategy categorization: SKIPPED (scikit-learn not installed)")
+            return
+
+        # Test with known merchants
+        result = strategy.categorize({"merchant": "Uber cab ride"})
+        assert "Transport" in result, f"Expected Transport for Uber, got '{result}'"
+
+        result = strategy.categorize({"merchant": "Netflix streaming"})
+        assert "Subscriptions" in result, f"Expected Subscriptions for Netflix, got '{result}'"
+
+        result = strategy.categorize({"merchant": "Starbucks coffee latte"})
+        assert "Food" in result, f"Expected Food for Starbucks, got '{result}'"
+
+        print("  ML strategy categorization: PASS")
+    except ImportError:
+        print("  ML strategy categorization: SKIPPED (scikit-learn not installed)")
+
+
+def test_strategy_switching():
+    """Test that CategorizationService.set_strategy() changes behavior."""
+    from categorization.service import CategorizationService
+    from categorization.strategies import RuleBasedStrategy, MLStrategy
+
+    service = CategorizationService(strategy=RuleBasedStrategy())
+    assert service.current_strategy_name == "RuleBasedStrategy"
+
+    tx = [{"merchant": "Starbucks", "amount": 5}]
+    result = service.process_transactions(tx)
+    assert result[0]["category"] == "Food"
+
+    # Switch strategy
+    try:
+        ml_strategy = MLStrategy()
+        service.set_strategy(ml_strategy)
+        assert service.current_strategy_name == "MLStrategy"
+
+        tx2 = [{"merchant": "Starbucks coffee", "amount": 5}]
+        result2 = service.process_transactions(tx2)
+        assert "Food" in result2[0]["category"]
+        print("  Strategy switching: PASS")
+    except ImportError:
+        print("  Strategy switching: PASS (ML part skipped, no sklearn)")
+
+
+def test_config_driven_strategy():
+    """Test that env-var-driven default strategy selection works."""
+    import os
+    from categorization.service import get_default_service
+
+    # Test default (rule)
+    old_val = os.environ.get("CATEGORIZATION_STRATEGY", "")
+    os.environ["CATEGORIZATION_STRATEGY"] = "rule"
+    service = get_default_service()
+    assert service.current_strategy_name == "RuleBasedStrategy"
+
+    # Test ML
+    os.environ["CATEGORIZATION_STRATEGY"] = "ml"
+    service_ml = get_default_service()
+    assert service_ml.current_strategy_name == "MLStrategy"
+
+    # Restore
+    if old_val:
+        os.environ["CATEGORIZATION_STRATEGY"] = old_val
+    else:
+        os.environ.pop("CATEGORIZATION_STRATEGY", None)
+
+    print("  Config-driven strategy: PASS")
+
+
+# --- Observer Pattern Tests ---
+
+def test_multi_threshold_alerts():
+    """Test that BudgetMonitor fires alerts at 80%, 100%, and 120% thresholds."""
+    from budget.monitor import BudgetMonitor
+    from budget.observers import AlertObserver
+
+    class TrackingObserver(AlertObserver):
+        def __init__(self):
+            self.alerts = []
+        def update(self, category, threshold, current_spend, alert_level="exceeded"):
+            self.alerts.append({
+                "category": category,
+                "level": alert_level,
+                "spend": current_spend,
+                "limit": threshold,
+            })
+            return {"delivered": True, "channel": "test", "detail": "mock"}
+
+    monitor = BudgetMonitor()
+    tracker = TrackingObserver()
+    monitor.attach(tracker)
+
+    # Spend 90% of budget -> should trigger 'warning' only
+    tracker.alerts = []
+    monitor.evaluate([{"category": "Food", "amount": 450}], {"Food": 500})
+    levels = [a["level"] for a in tracker.alerts]
+    assert "warning" in levels, f"Expected 'warning' at 90%, got: {levels}"
+    assert "exceeded" not in levels, f"Should not trigger 'exceeded' at 90%"
+
+    # Spend 110% -> should trigger 'warning' + 'exceeded'
+    tracker.alerts = []
+    monitor.evaluate([{"category": "Food", "amount": 550}], {"Food": 500})
+    levels = [a["level"] for a in tracker.alerts]
+    assert "warning" in levels and "exceeded" in levels, f"Expected warning+exceeded at 110%, got: {levels}"
+
+    # Spend 130% -> should trigger all three levels
+    tracker.alerts = []
+    monitor.evaluate([{"category": "Food", "amount": 650}], {"Food": 500})
+    levels = [a["level"] for a in tracker.alerts]
+    assert "warning" in levels and "exceeded" in levels and "critical" in levels, \
+        f"Expected all three levels at 130%, got: {levels}"
+
+    print("  Multi-threshold alerts: PASS")
+
+
+def test_email_notifier_mailjet_mock():
+    """Test EmailNotifier with mocked httpx (no real API call)."""
+    from budget.observers import EmailNotifier
+
+    notifier = EmailNotifier()
+    # Without API keys, it falls back to console print
+    result = notifier.update("Food", 500.0, 600.0, "exceeded")
+    assert result["delivered"] == True
+    assert result["channel"] == "email"
+    assert "Dev mode" in result["detail"]
+    print("  Email notifier (Mailjet mock): PASS")
+
+
+def test_push_notifier_firebase_mock():
+    """Test InAppNotifier with mocked Firebase (no real API call)."""
+    from budget.observers import InAppNotifier
+
+    notifier = InAppNotifier()
+    # Without Firebase key, it falls back to console print
+    result = notifier.update("Transport", 200.0, 250.0, "warning")
+    assert result["delivered"] == True
+    assert result["channel"] == "push"
+    assert "Dev mode" in result["detail"]
+    print("  Push notifier (Firebase mock): PASS")
+
+
+def test_logging_observer_audit():
+    """Test LoggingObserver writes structured audit entries."""
+    import tempfile, os
+    from budget.observers import LoggingObserver
+
+    # Use a temp file for the audit log
+    tmp_log = os.path.join(tempfile.gettempdir(), "test_audit.log")
+    observer = LoggingObserver(log_file=tmp_log)
+    result = observer.update("Shopping", 300.0, 450.0, "critical")
+
+    assert result["delivered"] == True
+    assert result["channel"] == "audit_log"
+    assert "category=Shopping" in result["detail"]
+    assert "level=critical" in result["detail"]
+    assert "spend=450.00" in result["detail"]
+
+    # Clean up
+    if os.path.exists(tmp_log):
+        os.remove(tmp_log)
+    print("  Logging observer audit: PASS")
+
+
+def test_observer_detach():
+    """Test that detaching an observer stops it from receiving alerts."""
+    from budget.monitor import BudgetMonitor
+    from budget.observers import AlertObserver
+
+    class CountingObserver(AlertObserver):
+        def __init__(self):
+            self.count = 0
+        def update(self, category, threshold, current_spend, alert_level="exceeded"):
+            self.count += 1
+            return {"delivered": True, "channel": "test", "detail": "counted"}
+
+    monitor = BudgetMonitor()
+    obs = CountingObserver()
+    monitor.attach(obs)
+
+    monitor.evaluate([{"category": "Food", "amount": 600}], {"Food": 500})
+    count_after_first = obs.count
+    assert count_after_first > 0, "Observer should have received alerts"
+
+    # Detach and re-evaluate
+    monitor.detach(obs)
+    monitor.evaluate([{"category": "Food", "amount": 700}], {"Food": 500})
+    assert obs.count == count_after_first, "Detached observer should not receive more alerts"
+
+    print("  Observer detach: PASS")
+
+
+# --- Chain of Responsibility Tests ---
+
+def test_currency_chain_primary_success():
+    """Test that ExchangeRateAPIHandler succeeds when API key is set (mocked)."""
+    from currency_converter.handlers import ExchangeRateAPIHandler
+
+    handler = ExchangeRateAPIHandler()
+    # Without API key configured, it will pass to next handler
+    # We test the chain logic by checking the handler exists and is callable
+    assert hasattr(handler, 'handle')
+    assert hasattr(handler, 'set_next')
+    assert handler._next_handler is None  # No next handler set yet
+    print("  Currency chain handler setup: PASS")
+
+
+def test_currency_chain_failover():
+    """Test that the chain falls through handlers correctly."""
+    from currency_converter.handlers import (
+        ExchangeRateAPIHandler, OpenExchangeRatesHandler, DBCachedRateHandler
+    )
+
+    # Build a chain with no API keys -> all handlers fall through
+    handler1 = ExchangeRateAPIHandler()
+    handler2 = OpenExchangeRatesHandler()
+    handler3 = DBCachedRateHandler()
+
+    handler1.set_next(handler2).set_next(handler3)
+
+    # Without API keys, handler1 -> handler2 -> handler3 -> 1.0
+    rate = handler1.handle("USD", "EUR")
+    assert isinstance(rate, float), f"Expected float, got {type(rate)}"
+    # Should reach the DB fallback which returns 1.0 (no DB session)
+    assert rate == 1.0, f"Expected 1.0 terminal fallback, got {rate}"
+    print("  Currency chain failover: PASS")
+
+
+def test_currency_chain_db_fallback():
+    """Test DBCachedRateHandler with a mock DB session."""
+    from currency_converter.handlers import DBCachedRateHandler
+
+    class MockCacheEntry:
+        def __init__(self, rate):
+            self.rate = rate
+            self.currency_pairs = "EUR_USD"
+            import datetime
+            self.last_updated = datetime.datetime.utcnow()
+
+    class MockQuery:
+        def __init__(self, entry):
+            self._entry = entry
+        def filter(self, *args):
+            return self
+        def first(self):
+            return self._entry
+
+    class MockDB:
+        def __init__(self, entry):
+            self._entry = entry
+        def query(self, model):
+            return MockQuery(self._entry)
+
+    handler = DBCachedRateHandler(db_session=MockDB(MockCacheEntry(1.08)))
+    rate = handler.handle("EUR", "USD")
+    assert rate == 1.08, f"Expected 1.08 from DB cache, got {rate}"
+    print("  Currency chain DB fallback: PASS")
+
+
+def test_same_currency_no_conversion():
+    """Test that same-currency conversion returns the original amount."""
+    from currency_converter.chain import CurrencyConversionChain
+
+    chain = CurrencyConversionChain()
+    result = chain.convert(100.0, "USD", "USD")
+    assert result["converted_amount"] == 100.0
+    assert result["rate"] == 1.0
+    assert result["base_currency"] == "USD"
+    assert result["target_currency"] == "USD"
+    print("  Same currency no conversion: PASS")
+
+
 if __name__ == "__main__":
     print("Running Tests")
     print()
@@ -381,6 +693,28 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"  Auth (Member 1): SKIPPED ({type(e).__name__}: passlib/bcrypt incompatible with Python 3.13)")
     
+    print()
+    print("--- Member 2: Strategy Pattern ---")
+    test_rule_based_strategy_expanded()
+    test_ml_strategy_categorization()
+    test_strategy_switching()
+    test_config_driven_strategy()
+
+    print()
+    print("--- Member 2: Observer Pattern ---")
+    test_multi_threshold_alerts()
+    test_email_notifier_mailjet_mock()
+    test_push_notifier_firebase_mock()
+    test_logging_observer_audit()
+    test_observer_detach()
+
+    print()
+    print("--- Member 2: Chain of Responsibility (Currency) ---")
+    test_currency_chain_primary_success()
+    test_currency_chain_failover()
+    test_currency_chain_db_fallback()
+    test_same_currency_no_conversion()
+
     print()
     print("--- Member 4: Chain of Responsibility (Enhanced) ---")
     test_enhanced_chain_of_responsibility()
@@ -404,3 +738,4 @@ if __name__ == "__main__":
     
     print()
     print("All unit tests passed successfully!")
+

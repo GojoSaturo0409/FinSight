@@ -13,6 +13,7 @@ from recommendations.router import router as recommendations_router
 from reports.router import router as reports_router
 from auth.router import router as auth_router
 from investments.router import router as investments_router
+from currency_converter.router import router as currency_router
 
 app = FastAPI(title="FinSight API", version="1.0.0")
 
@@ -31,6 +32,7 @@ app.include_router(recommendations_router, prefix="/recommendations", tags=["Rec
 app.include_router(reports_router, prefix="/reports", tags=["Reports"])
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(investments_router, prefix="/investments", tags=["Investments"])
+app.include_router(currency_router, prefix="/currency", tags=["Currency"])
 
 @app.get("/")
 def read_root():
