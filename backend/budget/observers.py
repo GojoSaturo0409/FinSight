@@ -169,7 +169,21 @@ class LoggingObserver(AlertObserver):
     def __init__(self, log_file: str = "audit.log"):
         self._audit_logger = logging.getLogger("finsight.audit")
         if not self._audit_logger.handlers:
-            handler = logging.FileHandler(log_file)
+            target_log = os.getenv("AUDIT_LOG_FILE", log_file)
+            try:
+                log_dir = os.path.dirname(target_log)
+                if log_dir:
+                    os.makedirs(log_dir, exist_ok=True)
+                handler = logging.FileHandler(target_log)
+            except PermissionError:
+                fallback_log = "/tmp/finsight_audit.log"
+                handler = logging.FileHandler(fallback_log)
+                logger.warning(
+                    "No permission for audit log '%s'; using fallback '%s'",
+                    target_log,
+                    fallback_log,
+                )
+
             handler.setFormatter(logging.Formatter(
                 "%(asctime)s | BUDGET_ALERT | %(message)s",
                 datefmt="%Y-%m-%d %H:%M:%S"
