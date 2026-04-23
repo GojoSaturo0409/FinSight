@@ -1,5 +1,5 @@
 from .interfaces import ITransactionSource
-from .adapters import PlaidAdapter, CSVAdapter
+from .adapters import PlaidAdapter, CSVAdapter, ManualEntryAdapter
 from typing import List, Dict, Any
 
 class TransactionFactory:
@@ -12,7 +12,7 @@ class TransactionFactory:
             # Data should be list of csv rows
             return CSVAdapter(raw_data)
         elif source_type == "manual":
-            # Simulating manual entry parser sharing logic with CSV or custom
-            return CSVAdapter(raw_data)
+            # Data should be a list of manual entry dicts
+            return ManualEntryAdapter(raw_data)
         else:
             raise ValueError(f"Unknown transaction source type: {source_type}")

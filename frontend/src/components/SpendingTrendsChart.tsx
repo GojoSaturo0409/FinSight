@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
+import { apiFetch } from '../api';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -12,32 +14,121 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-const SpendingTrendsChart = () => {
-    const labels = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-    const spendingData = [1850, 2100, 2400, 1950, 1800, 1716];
+interface SpendingTrendsProps {
+    transactions?: any[];
+}
+
+const SpendingTrendsChart = ({ transactions = [] }: SpendingTrendsProps) => {
+    const [chartData, setChartData] = useState<{ labels: string[]; values: number[] }>({
+        labels: [],
+        values: [],
+    });
+
+    useEffect(() => {
+        if (transactions.length > 0) {
+            const monthlyTotals: Record<string, number> = {};
+            const monthOrder: string[] = [];
+
+            for (const tx of transactions) {
+                if (tx.category === 'Income') continue;
+                const dateStr = tx.date || '';
+                const parts = dateStr.split('-');
+                if (parts.length >= 2) {
+                    const key = `${parts[0]}-${parts[1]}`;
+                    monthlyTotals[key] = (monthlyTotals[key] || 0) + tx.amount;
+                    if (!monthOrder.includes(key)) {
+                        monthOrder.push(key);
+                    }
+                }
+            }
+
+            monthOrder.sort();
+
+            const monthNames: Record<string, string> = {
+                '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+                '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+                '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+            };
+
+            const labels = monthOrder.map(k => monthNames[k.split('-')[1]] || k);
+            const values = monthOrder.map(k => Math.round(monthlyTotals[k] * 100) / 100);
+
+            if (labels.length > 0) {
+                setChartData({ labels, values });
+                return;
+            }
+        }
+
+        fetchSpendingTrends();
+    }, [transactions]);
+
+    const fetchSpendingTrends = async () => {
+        try {
+            const data = await apiFetch('/ingestion/transactions/all?limit=200');
+            const txs = data.data || [];
+
+            const monthlyTotals: Record<string, number> = {};
+            const monthOrder: string[] = [];
+
+            for (const tx of txs) {
+                if (tx.category === 'Income') continue;
+                const dateStr = tx.date || '';
+                const parts = dateStr.split('-');
+                if (parts.length >= 2) {
+                    const key = `${parts[0]}-${parts[1]}`;
+                    monthlyTotals[key] = (monthlyTotals[key] || 0) + tx.amount;
+                    if (!monthOrder.includes(key)) monthOrder.push(key);
+                }
+            }
+
+            monthOrder.sort();
+
+            const monthNames: Record<string, string> = {
+                '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+                '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug',
+                '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec',
+            };
+
+            const labels = monthOrder.map(k => monthNames[k.split('-')[1]] || k);
+            const values = monthOrder.map(k => Math.round(monthlyTotals[k] * 100) / 100);
+
+            if (labels.length > 0) {
+                setChartData({ labels, values });
+                return;
+            }
+        } catch {
+            // fallback
+        }
+
+        setChartData({
+            labels: [],
+            values: [],
+        });
+    };
 
     const data = {
-        labels,
+        labels: chartData.labels,
         datasets: [
             {
                 label: 'Monthly Spending',
-                data: spendingData,
+                data: chartData.values,
                 borderColor: 'rgba(244, 63, 94, 1)',
                 backgroundColor: (context: any) => {
                     const ctx = context.chart.ctx;
                     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-                    gradient.addColorStop(0, 'rgba(244, 63, 94, 0.3)');
-                    gradient.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+                    gradient.addColorStop(0, 'rgba(244, 63, 94, 0.5)');
+                    gradient.addColorStop(1, 'rgba(244, 63, 94, 0)');
                     return gradient;
                 },
                 fill: true,
                 tension: 0.4,
-                pointRadius: 5,
+                borderWidth: 3,
                 pointBackgroundColor: 'rgba(244, 63, 94, 1)',
-                pointBorderColor: '#0a0a0a',
-                pointBorderWidth: 2,
-                pointHoverRadius: 8,
-                borderWidth: 2.5,
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(244, 63, 94, 1)',
+                pointRadius: 4,
+                pointHoverRadius: 6,
             },
         ],
     };
@@ -45,46 +136,38 @@ const SpendingTrendsChart = () => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: {
-            intersect: false,
-            mode: 'index' as const,
-        },
         plugins: {
-            legend: {
-                display: false,
-            },
+            legend: { display: false },
             tooltip: {
-                backgroundColor: 'rgba(10, 10, 10, 0.95)',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1,
-                titleColor: '#e5e5e5',
-                bodyColor: '#a3a3a3',
+                backgroundColor: 'rgba(23, 23, 23, 0.9)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
                 padding: 12,
-                cornerRadius: 10,
-                displayColors: false,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
                 callbacks: {
                     label: function (context: any) {
-                        return `$${context.parsed.y.toLocaleString()}`;
+                        return `$${context.raw.toLocaleString()}`;
                     },
                 },
             },
         },
         scales: {
-            x: {
-                grid: { display: false },
-                border: { color: 'rgba(255,255,255,0.05)' },
-                ticks: { color: '#737373', font: { size: 12 } },
-            },
             y: {
-                grid: { color: 'rgba(255,255,255,0.03)' },
-                border: { display: false },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.05)',
+                    drawBorder: false,
+                },
                 ticks: {
-                    color: '#737373',
-                    font: { size: 11 },
+                    color: 'rgba(255, 255, 255, 0.5)',
                     callback: function (value: any) {
                         return '$' + value.toLocaleString();
                     },
                 },
+            },
+            x: {
+                grid: { display: false, drawBorder: false },
+                ticks: { color: 'rgba(255, 255, 255, 0.5)' },
             },
         },
     };
@@ -94,7 +177,7 @@ const SpendingTrendsChart = () => {
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold">Spending Trends</h3>
                 <span className="text-xs bg-rose-500/20 text-rose-300 px-2 py-1 rounded-md border border-rose-500/30">
-                    6 Months
+                    {chartData.labels.length} Months
                 </span>
             </div>
             <div className="h-[280px]">
@@ -103,5 +186,4 @@ const SpendingTrendsChart = () => {
         </div>
     );
 };
-
 export default SpendingTrendsChart;

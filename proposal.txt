@@ -47,7 +47,7 @@ monthly summary through four handlers: HighSpendDetector flags categories above 
 SubscriptionAuditHandler finds redundant recurring charges, SavingsGoalAdvisor checks progress
 1
 
-against targets, and InvestmentOpportunityHandler suggests low-risk investment instruments when
+against targets, and InvestmentOpportunityHandler suggests low-risk investment instruments when
 a monthly surplus exists. Market data for suggested instruments is retrieved from Alpha Vantage to
 display current prices and trends. A separate chain handles currency API fallback across ExchangeRateAPI, Open Exchange Rates, and the database cache.
 The Builder pattern constructs the monthly report through a fluent interface: ReportBuilder chained
@@ -100,5 +100,3 @@ require caching at the adapter layer. The need to avoid storing bank credentials
 daily cap on Alpha Vantage requests requires database caching of responses. These constraints are not
 artificial; they are real production concerns that the architecture handles directly.
 2
-
-

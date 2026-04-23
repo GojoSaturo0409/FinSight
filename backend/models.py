@@ -14,12 +14,21 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     amount = Column(Float, nullable=False)
     currency = Column(String, default="USD")
     category = Column(String, index=True)
     merchant = Column(String, index=True)
     date = Column(DateTime, default=datetime.datetime.utcnow)
     source = Column(String, index=True) # e.g., 'plaid', 'csv', 'manual'
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    category = Column(String, nullable=False, index=True)
+    limit_amount = Column(Float, nullable=False, default=500.0)
 
 class ExchangeRateCache(Base):
     __tablename__ = "exchange_rate_cache"

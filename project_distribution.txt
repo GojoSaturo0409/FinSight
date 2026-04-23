@@ -1,0 +1,37 @@
+Proposed Roles and Distribution
+Member 1: Backend Architect & Ingestion Specialist
+Focus: Core infrastructure and data entry.
+
+Responsibilities:
+Project scaffolding (FastAPI setup, Docker configuration).
+Database schema design and migrations (SQLAlchemy & Alembic).
+Authentication & Security (JWT, OAuth2 flows).
+Pattern: Factory (TransactionFactory) & Adapter (Plaid, CSV, Manual).
+Plaid API integration for bank sync.
+Member 2: Logic & Algos Developer
+Focus: Core business logic and service communication.
+
+Responsibilities:
+Pattern: Strategy (CategorizationService with Rule-based and ML strategies).
+Pattern: Observer (BudgetMonitor with Email, Push, and Log observers).
+Alert delivery integrations (Mailjet for Email, Firebase for Push).
+Pattern: Chain of Responsibility (Currency Fallback Chain across APIs).
+Managing external API fallbacks and rate limits.
+Member 3: Frontend Lead
+Focus: User interface and core dashboard experience.
+
+Responsibilities:
+React 18 SPA architecture and styling (TailwindCSS).
+Dashboard layout and core navigation.
+Transaction Management UI (Tables, Filters, Manual Entry forms).
+Budget Control Panel (Sliders and visual status indicators).
+State management for transaction and budget data.
+Member 4: Analytics & Visualization Specialist
+Focus: Insights generation and data presentation.
+
+Responsibilities:
+Pattern: Chain of Responsibility (Monthly Recommendation Engine handlers).
+Pattern: Builder (Monthly ReportBuilder).
+Alpha Vantage integration for investment data and portfolio caching.
+Interactive charts and graphs (Chart.js) for spending trends and net worth.
+Generating and exporting PDF/HTML reports.

@@ -40,3 +40,24 @@ class CSVAdapter(ITransactionSource):
                 "source": "csv"
             })
         return normalized
+
+class ManualEntryAdapter(ITransactionSource):
+    """Adapter for manually entered transactions (separate from CSV)."""
+    def __init__(self, raw_data: List[Dict[str, Any]]):
+        self.raw_data = raw_data
+
+    def fetch_transactions(self) -> List[Dict[str, Any]]:
+        normalized = []
+        for idx, entry in enumerate(self.raw_data):
+            normalized.append({
+                "id": f"manual_{idx}",
+                "amount": float(entry.get("amount", 0)),
+                "currency": entry.get("currency", "USD"),
+                "category": entry.get("category", "Uncategorized"),
+                "merchant": entry.get("merchant", "Unknown"),
+                "date": datetime.datetime.strptime(
+                    entry.get("date", "2000-01-01"), "%Y-%m-%d"
+                ) if isinstance(entry.get("date"), str) else entry.get("date", datetime.datetime.utcnow()),
+                "source": "manual"
+            })
+        return normalized

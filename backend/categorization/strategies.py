@@ -157,6 +157,25 @@ class MLStrategy(CategorizationStrategy):
         self._fallback = RuleBasedStrategy()
         self._categories: List[str] = []
         self._trained = False
+        self._model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
+        self._load_or_train()
+
+    def _load_or_train(self):
+        """Load from pickle if exists, otherwise train and save."""
+        import pickle
+        if os.path.exists(self._model_path):
+            try:
+                with open(self._model_path, 'rb') as f:
+                    data = pickle.load(f)
+                self._model = data['model']
+                self._vectorizer = data['vectorizer']
+                self._categories = data['categories']
+                self._trained = True
+                logger.info("MLStrategy: Successfully loaded model from %s", self._model_path)
+                return
+            except Exception as e:
+                logger.error("MLStrategy: Failed to load pickle file: %s. Re-training.", str(e))
+        
         self._train()
 
     def _train(self):
@@ -240,6 +259,19 @@ class MLStrategy(CategorizationStrategy):
             self._categories = list(set(labels))
             self._trained = True
             logger.info("MLStrategy: Naive Bayes classifier trained successfully on %d samples", len(training_data))
+
+            # Save to pickle
+            import pickle
+            try:
+                with open(self._model_path, 'wb') as f:
+                    pickle.dump({
+                        'model': self._model,
+                        'vectorizer': self._vectorizer,
+                        'categories': self._categories
+                    }, f)
+                logger.info("MLStrategy: Successfully saved model to %s", self._model_path)
+            except Exception as e:
+                logger.error("MLStrategy: Failed to save model to pickle: %s", str(e))
 
         except ImportError:
             logger.warning("MLStrategy: scikit-learn not installed, falling back to RuleBasedStrategy")

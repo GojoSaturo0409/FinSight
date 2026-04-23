@@ -30,14 +30,14 @@ This prototype utilizes a Three-Tier architecture designed with modern aesthetic
 ### Prerequisites
 - Docker and Docker Compose
 - Node.js (v20+ recommended for frontend standalone testing)
-- Python 3.10+ (for standalone backend testing)
+- Python 3.11+ (for standalone backend testing)
 
 ### Running the Application
 
 For a convenient out-of-the-box local development server, run the entire stack through Docker Compose:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 This deploys the PostgreSQL database mapping to port 5432 and the FastAPI server on `localhost:8000`. 
 Run the frontend server concurrently for development:
