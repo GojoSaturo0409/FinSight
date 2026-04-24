@@ -1,4 +1,5 @@
 export const API_BASE = 'http://localhost:8000';
+export const INGESTION_API_BASE = 'http://localhost:8001';
 
 export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     const token = localStorage.getItem('finsight_token');
@@ -15,7 +16,8 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const base = endpoint.startsWith('/ingestion') ? INGESTION_API_BASE : API_BASE;
+    const response = await fetch(`${base}${endpoint}`, {
         ...options,
         headers,
     });

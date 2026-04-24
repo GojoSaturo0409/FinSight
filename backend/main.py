@@ -7,7 +7,6 @@ import os
 # Add the backend dir to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from ingestion.router import router as ingestion_router
 from categorization.router import router as categorization_router
 from budget.router import router as budget_router
 from recommendations.router import router as recommendations_router
@@ -131,12 +130,26 @@ def _seed_demo_data():
         db.close()
 
 
+import threading
+from budget.subscriber import start_subscriber
+from core.subscriber import start_core_subscriber
+
+def _start_budget_subscriber():
+    subscriber_thread = threading.Thread(target=start_subscriber, daemon=True)
+    subscriber_thread.start()
+
+def _start_core_subscriber():
+    core_thread = threading.Thread(target=start_core_subscriber, daemon=True)
+    core_thread.start()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables and seed demo data."""
     from database import create_tables
     create_tables()
     _seed_demo_data()
+    _start_budget_subscriber()
+    _start_core_subscriber()
     yield
 
 
@@ -150,7 +163,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ingestion_router, prefix="/ingestion", tags=["Ingestion"])
 app.include_router(categorization_router, prefix="/categorization", tags=["Categorization"])
 app.include_router(budget_router, prefix="/budget", tags=["Budget"])
 app.include_router(recommendations_router, prefix="/recommendations", tags=["Recommendations"])

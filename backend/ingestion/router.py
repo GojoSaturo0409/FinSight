@@ -71,6 +71,7 @@ def sync_transactions(
 
         # Persist to database
         saved = []
+        db_txs = []
         for tx in parsed_transactions:
             db_tx = models.Transaction(
                 id=tx.get("id", str(uuid.uuid4())),
@@ -84,8 +85,12 @@ def sync_transactions(
             )
             db.add(db_tx)
             saved.append(tx)
+            db_txs.append(db_tx)
 
         db.commit()
+        from .events import publish_transaction_ingested
+        for db_tx in db_txs:
+            publish_transaction_ingested(db_tx)
         return {"status": "success", "count": len(saved), "data": saved}
     except Exception as e:
         db.rollback()
@@ -169,6 +174,7 @@ def exchange_public_token(
 
         # Save to DB
         saved = []
+        db_txs = []
         for tx in parsed:
             # Currency conversion logic
             if tx["currency"] != "USD":
@@ -188,8 +194,12 @@ def exchange_public_token(
             )
             db.add(db_tx)
             saved.append(tx)
+            db_txs.append(db_tx)
 
         db.commit()
+        from .events import publish_transaction_ingested
+        for db_tx in db_txs:
+            publish_transaction_ingested(db_tx)
         return {"status": "success", "count": len(saved), "access_token_saved": True}
         
     except plaid.ApiException as e:
@@ -220,6 +230,8 @@ def add_manual_transaction(
         db.add(db_tx)
         db.commit()
         db.refresh(db_tx)
+        from .events import publish_transaction_ingested
+        publish_transaction_ingested(db_tx)
         return {
             "status": "success",
             "transaction": {
@@ -253,6 +265,7 @@ def upload_csv(
         parsed = parser.fetch_transactions()
 
         saved = []
+        db_txs = []
         for tx in parsed:
             if tx["currency"] != "USD":
                 result = converter_chain.convert(tx["amount"], tx["currency"], "USD")
@@ -271,8 +284,12 @@ def upload_csv(
             )
             db.add(db_tx)
             saved.append(tx)
+            db_txs.append(db_tx)
 
         db.commit()
+        from .events import publish_transaction_ingested
+        for db_tx in db_txs:
+            publish_transaction_ingested(db_tx)
         return {"status": "success", "count": len(saved), "data": saved}
     except Exception as e:
         db.rollback()

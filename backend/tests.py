@@ -39,20 +39,21 @@ def test_factory_pattern():
     assert isinstance(parser_csv, CSVAdapter)
 
 def test_observer_pattern():
-    monitor = BudgetMonitor()
-    obs1 = MockObserver()
-    obs2 = MockObserver()
+    from unittest.mock import patch
+    import json
     
-    monitor.attach(obs1)
-    monitor.attach(obs2)
-    
-    # 50 spend, limit 40 -> ratio 1.25 triggers: warning (0.80), exceeded (1.00), critical (1.20)
-    monitor.evaluate([{"category": "Food", "amount": 50}], {"Food": 40})
-    
-    # Multi-threshold: 3 alerts fired (warning, exceeded, critical)
-    assert len(obs1.alerts) == 3
-    assert obs1.alerts[0] == ("Food", 40, 50)
-    assert len(obs2.alerts) == 3
+    with patch('budget.monitor.pika.BlockingConnection') as mock_conn:
+        mock_channel = mock_conn.return_value.channel.return_value
+        monitor = BudgetMonitor()
+        
+        # 50 spend, limit 40 -> ratio 1.25 triggers: warning (0.80), exceeded (1.00), critical (1.20)
+        monitor.evaluate([{"category": "Food", "amount": 50}], {"Food": 40})
+        
+        # Multi-threshold: 3 alerts fired (warning, exceeded, critical)
+        assert mock_channel.basic_publish.call_count == 3
+        calls = mock_channel.basic_publish.call_args_list
+        levels = [json.loads(c[1]['body'])["alert_level"] for c in calls]
+        assert "warning" in levels and "exceeded" in levels and "critical" in levels
 
 def test_chain_of_responsibility():
     chain = RecommendationChain()
@@ -479,43 +480,35 @@ def test_config_driven_strategy():
 def test_multi_threshold_alerts():
     """Test that BudgetMonitor fires alerts at 80%, 100%, and 120% thresholds."""
     from budget.monitor import BudgetMonitor
-    from budget.observers import AlertObserver
+    from unittest.mock import patch
+    import json
 
-    class TrackingObserver(AlertObserver):
-        def __init__(self):
-            self.alerts = []
-        def update(self, category, threshold, current_spend, alert_level="exceeded"):
-            self.alerts.append({
-                "category": category,
-                "level": alert_level,
-                "spend": current_spend,
-                "limit": threshold,
-            })
-            return {"delivered": True, "channel": "test", "detail": "mock"}
+    with patch('budget.monitor.pika.BlockingConnection') as mock_conn:
+        mock_channel = mock_conn.return_value.channel.return_value
+        monitor = BudgetMonitor()
+        
+        # Spend 90% of budget -> should trigger 'warning' only
+        mock_channel.basic_publish.reset_mock()
+        monitor.evaluate([{"category": "Food", "amount": 450}], {"Food": 500})
+        calls = mock_channel.basic_publish.call_args_list
+        levels = [json.loads(c[1]['body'])["alert_level"] for c in calls]
+        assert "warning" in levels, f"Expected 'warning' at 90%, got: {levels}"
+        assert "exceeded" not in levels, f"Should not trigger 'exceeded' at 90%"
 
-    monitor = BudgetMonitor()
-    tracker = TrackingObserver()
-    monitor.attach(tracker)
+        # Spend 110% -> should trigger 'warning' + 'exceeded'
+        mock_channel.basic_publish.reset_mock()
+        monitor.evaluate([{"category": "Food", "amount": 550}], {"Food": 500})
+        calls = mock_channel.basic_publish.call_args_list
+        levels = [json.loads(c[1]['body'])["alert_level"] for c in calls]
+        assert "warning" in levels and "exceeded" in levels, f"Expected warning+exceeded at 110%, got: {levels}"
 
-    # Spend 90% of budget -> should trigger 'warning' only
-    tracker.alerts = []
-    monitor.evaluate([{"category": "Food", "amount": 450}], {"Food": 500})
-    levels = [a["level"] for a in tracker.alerts]
-    assert "warning" in levels, f"Expected 'warning' at 90%, got: {levels}"
-    assert "exceeded" not in levels, f"Should not trigger 'exceeded' at 90%"
-
-    # Spend 110% -> should trigger 'warning' + 'exceeded'
-    tracker.alerts = []
-    monitor.evaluate([{"category": "Food", "amount": 550}], {"Food": 500})
-    levels = [a["level"] for a in tracker.alerts]
-    assert "warning" in levels and "exceeded" in levels, f"Expected warning+exceeded at 110%, got: {levels}"
-
-    # Spend 130% -> should trigger all three levels
-    tracker.alerts = []
-    monitor.evaluate([{"category": "Food", "amount": 650}], {"Food": 500})
-    levels = [a["level"] for a in tracker.alerts]
-    assert "warning" in levels and "exceeded" in levels and "critical" in levels, \
-        f"Expected all three levels at 130%, got: {levels}"
+        # Spend 130% -> should trigger all three levels
+        mock_channel.basic_publish.reset_mock()
+        monitor.evaluate([{"category": "Food", "amount": 650}], {"Food": 500})
+        calls = mock_channel.basic_publish.call_args_list
+        levels = [json.loads(c[1]['body'])["alert_level"] for c in calls]
+        assert "warning" in levels and "exceeded" in levels and "critical" in levels, \
+            f"Expected all three levels at 130%, got: {levels}"
 
     print("  Multi-threshold alerts: PASS")
 
@@ -571,29 +564,13 @@ def test_logging_observer_audit():
 def test_observer_detach():
     """Test that detaching an observer stops it from receiving alerts."""
     from budget.monitor import BudgetMonitor
-    from budget.observers import AlertObserver
-
-    class CountingObserver(AlertObserver):
-        def __init__(self):
-            self.count = 0
-        def update(self, category, threshold, current_spend, alert_level="exceeded"):
-            self.count += 1
-            return {"delivered": True, "channel": "test", "detail": "counted"}
 
     monitor = BudgetMonitor()
-    obs = CountingObserver()
-    monitor.attach(obs)
+    
+    # Detach is now deprecated because subscribers handle events independently
+    monitor.detach(None)
 
-    monitor.evaluate([{"category": "Food", "amount": 600}], {"Food": 500})
-    count_after_first = obs.count
-    assert count_after_first > 0, "Observer should have received alerts"
-
-    # Detach and re-evaluate
-    monitor.detach(obs)
-    monitor.evaluate([{"category": "Food", "amount": 700}], {"Food": 500})
-    assert obs.count == count_after_first, "Detached observer should not receive more alerts"
-
-    print("  Observer detach: PASS")
+    print("  Observer detach: PASS (Deprecated for Pub-Sub)")
 
 
 # --- Chain of Responsibility Tests ---

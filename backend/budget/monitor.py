@@ -1,6 +1,8 @@
 from typing import List, Dict, Any
 from .observers import AlertObserver
 import logging
+import json
+import pika
 
 logger = logging.getLogger(__name__)
 
@@ -9,11 +11,7 @@ class BudgetMonitor:
     """
     Observer-pattern subject that evaluates spending against budget thresholds
     and notifies all registered observers when limits are breached.
-    
-    Supports multi-level thresholds:
-      - 'warning'  at 80% of budget
-      - 'exceeded' at 100% of budget
-      - 'critical' at 120% of budget
+    Now refactored to use RabbitMQ Pub-Sub decoupling.
     """
 
     # Threshold levels as (ratio, label)
@@ -24,28 +22,39 @@ class BudgetMonitor:
     ]
 
     def __init__(self):
-        self._observers: List[AlertObserver] = []
+        pass
 
     def attach(self, observer: AlertObserver) -> None:
-        """Register a new observer for budget alerts."""
-        if observer not in self._observers:
-            self._observers.append(observer)
-            logger.info("BudgetMonitor: Attached observer %s", type(observer).__name__)
+        pass
 
     def detach(self, observer: AlertObserver) -> None:
-        """Remove an observer from budget alerts."""
-        self._observers.remove(observer)
-        logger.info("BudgetMonitor: Detached observer %s", type(observer).__name__)
+        pass
 
     def notify(self, category: str, threshold: float, current_spend: float,
                alert_level: str = "exceeded") -> List[Dict[str, Any]]:
-        """Notify all observers about a budget alert and collect delivery statuses."""
-        results = []
-        for observer in self._observers:
-            result = observer.update(category, threshold, current_spend, alert_level)
-            if result:
-                results.append(result)
-        return results
+        """Publish a budget alert to RabbitMQ."""
+        payload = {
+            "category": category,
+            "threshold": threshold,
+            "current_spend": current_spend,
+            "alert_level": alert_level
+        }
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=5672))
+            channel = connection.channel()
+            channel.exchange_declare(exchange='budget_events', exchange_type='fanout')
+            channel.basic_publish(
+                exchange='budget_events',
+                routing_key='',
+                body=json.dumps(payload),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            connection.close()
+            logger.info("BudgetMonitor: Published event for %s (%s)", category, alert_level)
+            return [{"delivered": True, "channel": "rabbitmq", "detail": "Published to broker"}]
+        except BaseException as e:
+            logger.error("BudgetMonitor: Failed to publish event: %s", str(e))
+            return [{"delivered": False, "channel": "rabbitmq", "detail": str(e)}]
 
     # Alias per the proposal spec
     notify_all = notify
