@@ -11,9 +11,12 @@ This prototype utilizes a Three-Tier architecture designed with modern aesthetic
 - **Styling:** Tailwind CSS v4 (Glassmorphic Interface)
 - **Visualizations:** Chart.js
 
-### Backend
-- **Framework:** FastAPI
+### Backend (Microservices Core)
+- **Architecture:** Distributed Microservices (`api_gateway`, `auth_service`, `transaction_service`, `budget_service`, `analytics_service`)
+- **Frameworks:** FastAPI, Nginx (Gateway)
 - **Database:** PostgreSQL 15 via SQLAlchemy
+- **Messaging/Async:** RabbitMQ & Celery
+- **Caching:** Redis
 
 ### Implemented Design Patterns
 1. **Factory Pattern:** `TransactionFactory` evaluates data sources (e.g. Plaid, CSV) to generate correct parsing instances.
@@ -39,7 +42,7 @@ For a convenient out-of-the-box local development server, run the entire stack t
 ```bash
 docker compose up --build
 ```
-This deploys the PostgreSQL database mapping to port 5432 and the FastAPI server on `localhost:8000`. 
+This deploys PostgreSQL, Redis, RabbitMQ, multiple custom service containers, and routes all traffic through the **Nginx API Gateway** on `localhost:8000`. 
 Run the frontend server concurrently for development:
 
 ```bash
@@ -50,8 +53,9 @@ npm run dev
 
 ### Running Tests
 
-Verification scripts test the logic decoupling of the core Design Patterns directly:
+Verification scripts are executed securely through the local conda environment targeting standard `pytest` mechanisms within the microservices `/services/tests` boundary:
 
 ```bash
-python3 backend/tests.py
+chmod +x run_tests.sh
+./run_tests.sh
 ```

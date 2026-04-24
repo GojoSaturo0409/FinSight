@@ -1,64 +1,93 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:15
-    restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: finsight
+      POSTGRES_PASSWORD: secretpassword
       POSTGRES_DB: finsight_db
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
   rabbitmq:
     image: rabbitmq:3-management
-    restart: always
     ports:
       - "5672:5672"
       - "15672:15672"
 
-  backend:
-    build: ./backend
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    restart: always
+  api_gateway:
+    image: nginx:alpine
+    volumes:
+      - ./services/api_gateway/nginx.conf:/etc/nginx/nginx.conf
     ports:
-      - "8000:8000"
+      - "8000:80"
+    depends_on:
+      - auth_service
+      - transaction_service
+      - budget_service
+      - analytics_service
+
+  auth_service:
+    build: 
+      context: .
+      dockerfile: ./services/auth_service/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://finsight:secretpassword@db/finsight_db
+    depends_on:
+      - db
+
+  transaction_service:
+    build: 
+      context: .
+      dockerfile: ./services/transaction_service/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://finsight:secretpassword@db/finsight_db
+      - REDIS_URL=redis://redis:6379/
+    depends_on:
+      - db
+      - redis
+
+  budget_service:
+    build: 
+      context: .
+      dockerfile: ./services/budget_service/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://finsight:secretpassword@db/finsight_db
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
     depends_on:
       - db
       - rabbitmq
-    volumes:
-      - ./backend:/app
-    environment:
-      - SECRET_KEY=supersecretkey
-    env_file:
-      - ./backend/.env
 
-  ingestion:
-    build: ./backend
-    command: uvicorn main_ingestion:app --host 0.0.0.0 --port 8001 --reload
-    restart: always
-    ports:
-      - "8001:8001"
+  budget_worker:
+    build: 
+      context: .
+      dockerfile: ./services/budget_service/Dockerfile
+    command: ["celery", "-A", "budget.tasks", "worker", "--loglevel=info"]
+    environment:
+      - DATABASE_URL=postgresql://finsight:secretpassword@db/finsight_db
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      - rabbitmq
+      - db
+
+  analytics_service:
+    build: 
+      context: .
+      dockerfile: ./services/analytics_service/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://finsight:secretpassword@db/finsight_db
+      - REDIS_URL=redis://redis:6379/
     depends_on:
       - db
-      - rabbitmq
-    volumes:
-      - ./backend:/app
-    environment:
-      - SECRET_KEY=supersecretkey
-    env_file:
-      - ./backend/.env
-
-  frontend:
-    build: ./frontend
-    restart: always
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend/src:/app/src
+      - redis
 
 volumes:
-  pgdata:
+  postgres_data:

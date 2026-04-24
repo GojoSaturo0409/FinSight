@@ -1,1 +1,0 @@
-# Categorization module - Strategy Pattern
