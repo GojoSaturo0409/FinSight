@@ -1,60 +1,97 @@
 # FinSight
 
-FinSight is a personal finance management platform offering multi-source transaction ingestion, real-time budget tracking, and an analytics dashboard with a savings recommendation engine.
+> **CS6.401 Software Engineering — Project 3 | Team 6**
 
-## Project Architecture
+FinSight is a personal finance management platform offering multi-source transaction ingestion, real-time budget tracking with email & push notifications, investment portfolio management, and an analytics dashboard with AI-powered savings recommendations.
 
-This prototype utilizes a Three-Tier architecture designed with modern aesthetics and strict decoupling facilitated via fundamental software engineering Design Patterns.
+**📄 Project Report:** [`Team6_Project_Report.pdf`](./Team6_Project_Report.pdf)
 
-### Frontend
-- **Framework:** React 18 (Vite)
-- **Styling:** Tailwind CSS v4 (Glassmorphic Interface)
-- **Visualizations:** Chart.js
+---
 
-### Backend (Microservices Core)
-- **Architecture:** Distributed Microservices (`api_gateway`, `auth_service`, `transaction_service`, `budget_service`, `analytics_service`)
-- **Frameworks:** FastAPI, Nginx (Gateway)
-- **Database:** PostgreSQL 15 via SQLAlchemy
-- **Messaging/Async:** RabbitMQ & Celery
-- **Caching:** Redis
+## Architecture
 
-### Implemented Design Patterns
-1. **Factory Pattern:** `TransactionFactory` evaluates data sources (e.g. Plaid, CSV) to generate correct parsing instances.
-2. **Adapter Pattern:** `PlaidAdapter` and `CSVAdapter` conform unstructured external data to a common domain `Transaction` model.
-3. **Chain of Responsibility Pattern:** 
-   - Used in the Recommendation Engine to funnel data sequentially through handlers (`HighSpendDetector`, `SubscriptionAuditHandler`).
-   - Used for Currency Conversion failover mechanisms across APIs and DB Cache fallbacks.
-4. **Strategy Pattern:** `CategorizationService` allows switching logic implementations between algorithm modes (`RuleBased` vs. `ML`).
-5. **Observer Pattern:** `BudgetMonitor` evaluates transactions and actively publishes budget threshold alerts to dependent services (EmailNotifier, FirebaseNotifier).
-6. **Builder Pattern:** `ReportBuilder` handles incremental step-wise assembly of the complex Monthly Report.
+This system uses an **Event-Driven Microservices** architecture with asynchronous AMQP messaging (RabbitMQ) and synchronous REST HTTP communication.
+
+### Subsystems
+| Service | Stack | Purpose |
+|---------|-------|---------|
+| **Frontend SPA** | React 18 (Vite), TypeScript, Tailwind CSS | Interactive dashboard with charts, budgets, and portfolio |
+| **API Gateway** | Nginx | Unified reverse-proxy routing |
+| **Auth Service** | FastAPI, JWT, bcrypt | Registration, login, token management |
+| **Transaction Service** | FastAPI, Plaid SDK | Multi-source ingestion via Adapter pattern |
+| **Budget Service** | FastAPI, Pika | Budget evaluation and event publishing |
+| **Analytics Service** | FastAPI, WeasyPrint | AI insights, investments, PDF reports |
+| **Budget Worker** | Celery | Async notification dispatcher (Mailjet + Firebase) |
+| **Database** | PostgreSQL 15, SQLAlchemy | Persistent relational storage |
+| **Message Broker** | RabbitMQ | Fanout exchange for budget events |
+| **Cache** | Redis | Currency rate caching |
+
+### Design Patterns Implemented
+1. **Factory Pattern** — `TransactionFactory` selects the correct parser based on data source
+2. **Adapter Pattern** — `PlaidAdapter`, `CSVAdapter`, `ManualEntryAdapter` normalize heterogeneous data
+3. **Observer Pattern** — `BudgetMonitor` notifies `EmailNotifier`, `InAppNotifier`, `LoggingObserver`
+4. **Chain of Responsibility** — Currency conversion fallback (Cache → Live API → Hardcoded)
+5. **Strategy Pattern** — `CategorizationService` supports rule-based vs. ML classification
+6. **Builder Pattern** — `ReportBuilder` assembles complex monthly PDF reports step-by-step
+7. **Pub/Sub** — RabbitMQ fanout exchange for asynchronous event broadcasting
+
+---
+
+## Team Contributions
+| Member | Responsibility |
+|--------|---------------|
+| **Ananth** | Frontend Development & UI Engineering |
+| **Lokesh** | Analytics Pipeline & Data Visualization |
+| **Eshwar** | Core Business Logic & Microservice Architecture |
+| **Rahul** | Core Logic, API Integrations & Systems Integration |
+| **Ayush** | Core Logic, API Integrations & Systems Integration |
+
+---
 
 ## Getting Started
 
 ### Prerequisites
-- Docker and Docker Compose
-- Node.js (v20+ recommended for frontend standalone testing)
+- Docker & Docker Compose
+- Node.js v18+ (for frontend development)
 - Python 3.11+ (for standalone backend testing)
+
+### Environment Setup
+Create a `.env` file in the project root with the following keys:
+```env
+DATABASE_URL=postgresql://user:password@db:5432/finsight
+SECRET_KEY=your-jwt-secret
+
+# Plaid (Sandbox)
+PLAID_CLIENT_ID=your_plaid_client_id
+PLAID_SECRET=your_plaid_secret
+
+# Mailjet
+MAILJET_API_KEY=your_mailjet_api_key
+MAILJET_SECRET_KEY=your_mailjet_secret_key
+MAILJET_SENDER_EMAIL=sender@example.com
+MAILJET_RECIPIENT_EMAIL=recipient@example.com
+
+# Firebase
+FIREBASE_CERT_PATH=/app/firebase-credentials.json
+```
 
 ### Running the Application
 
-For a convenient out-of-the-box local development server, run the entire stack through Docker Compose:
-
+Launch all services with Docker Compose:
 ```bash
 docker compose up --build
 ```
-This deploys PostgreSQL, Redis, RabbitMQ, multiple custom service containers, and routes all traffic through the **Nginx API Gateway** on `localhost:8000`. 
-Run the frontend server concurrently for development:
 
+Run the frontend dev server:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+The app will be available at `http://localhost:5173`.
+
 ### Running Tests
-
-Verification scripts are executed securely through the local conda environment targeting standard `pytest` mechanisms within the microservices `/services/tests` boundary:
-
 ```bash
 chmod +x run_tests.sh
 ./run_tests.sh
