@@ -104,7 +104,7 @@ def create_link_token(current_user: models.User = Depends(get_current_user)):
             return {"link_token": "link-sandbox-mock-12345"}
             
         request = LinkTokenCreateRequest(
-            products=[Products("transactions")],
+            products=[Products("transactions"), Products("investments")],
             client_name="FinSight",
             country_codes=[CountryCode("US")],
             language="en",
@@ -127,6 +127,8 @@ def exchange_public_token(
     current_user: models.User = Depends(get_current_user)
 ):
     """Exchanges public_token for access_token and performs initial transaction sync."""
+    import time as _time
+
     try:
         if req.public_token == 'mock-public-token-123' or not os.getenv('PLAID_CLIENT_ID'):
             # The user triggered the simulated flow because they lack Sandbox keys.
@@ -136,10 +138,19 @@ def exchange_public_token(
         exchange_response = client.item_public_token_exchange(exchange_request)
         access_token = exchange_response['access_token']
 
-        # Perform an initial sync from Plaid
-        sync_request = TransactionsSyncRequest(access_token=access_token)
-        sync_response = client.transactions_sync(sync_request)
-        all_transactions = sync_response['added']
+        # Save the access token on the user for future syncs
+        current_user.plaid_access_token = access_token
+        db.commit()
+
+        # --- Retry loop: Sandbox prepares data asynchronously ---
+        all_transactions = []
+        for attempt in range(5):
+            sync_request = TransactionsSyncRequest(access_token=access_token)
+            sync_response = client.transactions_sync(sync_request)
+            all_transactions = sync_response['added']
+            if len(all_transactions) > 0:
+                break
+            _time.sleep(3)  # Wait for sandbox to prepare data
 
         # Get accounts info for balances
         from plaid.model.accounts_get_request import AccountsGetRequest
@@ -151,7 +162,7 @@ def exchange_public_token(
         parser = TransactionFactory.create_parser("plaid", {"transactions": all_transactions, "accounts": all_accounts})
         parsed = parser.fetch_transactions()
 
-        # Save to DB
+        # Save transactions to DB
         saved = []
         db_txs = []
         for tx in parsed:
@@ -177,17 +188,62 @@ def exchange_public_token(
                 saved.append(tx)
                 db_txs.append(db_tx)
 
+        # --- Fetch Investment Holdings ---
+        inv_count = 0
+        try:
+            from plaid.model.investments_holdings_get_request import InvestmentsHoldingsGetRequest
+            inv_request = InvestmentsHoldingsGetRequest(access_token=access_token)
+            inv_response = client.investments_holdings_get(inv_request)
+            holdings = inv_response.get('holdings', [])
+            securities = {s['security_id']: s for s in inv_response.get('securities', [])}
+
+            for holding in holdings:
+                sec = securities.get(holding.get('security_id', ''), {})
+                symbol = sec.get('ticker_symbol', 'UNKNOWN')
+                if not symbol or symbol == 'UNKNOWN':
+                    continue
+
+                shares = float(holding.get('quantity', 0))
+                price = float(holding.get('institution_price', 0))
+
+                existing_inv = db.query(models.Investment).filter(
+                    models.Investment.user_id == current_user.id,
+                    models.Investment.symbol == symbol
+                ).first()
+
+                if existing_inv:
+                    existing_inv.shares = shares
+                    existing_inv.average_price = price
+                    existing_inv.last_updated = datetime.datetime.utcnow()
+                else:
+                    new_inv = models.Investment(
+                        user_id=current_user.id,
+                        symbol=symbol,
+                        shares=shares,
+                        average_price=price,
+                        last_updated=datetime.datetime.utcnow(),
+                    )
+                    db.add(new_inv)
+                inv_count += 1
+        except Exception as inv_err:
+            # Investment fetch may fail (e.g., product not available); don't block transactions
+            print(f"Investment fetch warning: {inv_err}")
+
         db.commit()
         from .events import publish_transaction_ingested
         for db_tx in db_txs:
             publish_transaction_ingested(db_tx)
-        return {"status": "success", "count": len(saved), "access_token_saved": True}
+        return {"status": "success", "count": len(saved), "investments": inv_count, "access_token_saved": True}
         
     except plaid.ApiException as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Plaid Error: {e.body}")
     except Exception as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/manual")

@@ -35,13 +35,13 @@ const LoginPage = ({ onSwitchToRegister }: { onSwitchToRegister: () => void }) =
                     <div>
                         <div className="relative">
                             <Mail className="absolute left-3 top-3.5 text-neutral-500" size={18} />
-                            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" />
+                            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" autoComplete="username" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" />
                         </div>
                     </div>
                     <div>
                         <div className="relative">
                             <Lock className="absolute left-3 top-3.5 text-neutral-500" size={18} />
-                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" />
+                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" />
                         </div>
                     </div>
                     <button type="submit" disabled={loading} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">

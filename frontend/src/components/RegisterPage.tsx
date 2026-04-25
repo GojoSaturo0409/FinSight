@@ -40,19 +40,19 @@ const RegisterPage = ({ onSwitchToLogin }: { onSwitchToLogin: () => void }) => {
                     <div>
                         <div className="relative">
                             <Mail className="absolute left-3 top-3.5 text-neutral-500" size={18} />
-                            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
+                            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email Address" autoComplete="username" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
                         </div>
                     </div>
                     <div>
                         <div className="relative">
                             <Lock className="absolute left-3 top-3.5 text-neutral-500" size={18} />
-                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
+                            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="new-password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
                         </div>
                     </div>
                     <div>
                         <div className="relative">
                             <Lock className="absolute left-3 top-3.5 text-neutral-500" size={18} />
-                            <input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm Password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
+                            <input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm Password" autoComplete="new-password" className="w-full bg-neutral-800/50 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" />
                         </div>
                     </div>
                     <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">

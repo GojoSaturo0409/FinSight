@@ -11,6 +11,9 @@ class PlaidParser:
     def parse(self) -> List[Dict[str, Any]]:
         if isinstance(self.raw_data, str):
             return json.loads(self.raw_data)
+        elif isinstance(self.raw_data, dict):
+            # Pass dict through as-is (e.g. {"transactions": [...], "accounts": [...]})
+            return self.raw_data
         elif isinstance(self.raw_data, list):
             return self.raw_data
         return []
