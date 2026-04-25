@@ -92,7 +92,7 @@ class ReportBuilder:
         Render the report as an HTML string using the Jinja2 template.
         Generates matplotlib charts as base64 PNG images embedded inline.
         """
-        from reports.chart_renderer import (
+        from .chart_renderer import (
             render_spending_pie_chart,
             render_net_worth_line_chart,
         )

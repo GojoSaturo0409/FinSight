@@ -5,6 +5,7 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import TransactionTable from './components/TransactionTable';
 import BudgetPanel from './components/BudgetPanel';
+import CurrencyConverter from './components/CurrencyConverter';
 import Header from './components/Header';
 import ExpenseChart from './components/ExpenseChart';
 import SpendingTrendsChart from './components/SpendingTrendsChart';
@@ -15,33 +16,62 @@ import ReportExport from './components/ReportExport';
 import ManualEntryForm from './components/ManualEntryForm';
 import CSVUpload from './components/CSVUpload';
 import PlaidLinkButton from './components/PlaidLinkButton';
+import { CurrencyProvider, useCurrency } from './components/CurrencyContext';
 import { apiFetch } from './api';
 
 function Dashboard() {
   const { isAuthenticated } = useAuth();
+  const { format } = useCurrency();
   const [transactions, setTransactions] = React.useState<any[]>([]);
+  const [investmentValue, setInvestmentValue] = React.useState(0);
   const [budgetAlerts] = React.useState<string[]>([]);
   const [activeTab, setActiveTab] = React.useState('dashboard');
   const [authPage, setAuthPage] = React.useState<'login' | 'register'>('login');
+  const [loadingDemo, setLoadingDemo] = React.useState(false);
 
   const fetchTransactions = React.useCallback(async () => {
     try {
-      const data = await apiFetch('/ingestion/transactions/all');
+      const data = await apiFetch('/ingestion/transactions');
       setTransactions(data.data || []);
     } catch {
       setTransactions([]);
     }
   }, []);
 
+  const loadDemoData = async () => {
+    setLoadingDemo(true);
+    try {
+      await apiFetch('/ingestion/demo-data', { method: 'POST' });
+      await apiFetch('/budget/evaluate-auto', { method: 'POST' });
+      fetchTransactions();
+    } catch (e) {
+      console.error("Failed to load demo data", e);
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
+
+  const fetchPortfolio = React.useCallback(async () => {
+    try {
+      const data = await apiFetch('/investments/portfolio');
+      const val = data.portfolio.reduce((sum: number, item: any) => sum + (item.total_value || 0), 0);
+      setInvestmentValue(val);
+    } catch {
+      setInvestmentValue(0);
+    }
+  }, []);
+
   React.useEffect(() => {
     fetchTransactions();
-  }, [fetchTransactions]);
+    fetchPortfolio();
+  }, [fetchTransactions, fetchPortfolio]);
 
   const totalSpend = transactions.filter(t => t.category !== 'Income').reduce((s, t) => s + t.amount, 0);
   const incomeFromTx = transactions.filter(t => t.category === 'Income').reduce((s, t) => s + t.amount, 0);
   const totalIncome = incomeFromTx > 0 ? incomeFromTx : 0;
   const savingsRatio = totalIncome > 0 ? Math.round(((totalIncome - totalSpend) / totalIncome) * 100) : 0;
   const balance = totalIncome - totalSpend;
+  const netWorth = balance + investmentValue;
 
   if (!isAuthenticated) {
     if (authPage === 'register') {
@@ -60,14 +90,13 @@ function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-neutral-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 flex flex-col justify-between hidden md:flex">
                 <div className="flex justify-between items-center text-neutral-400">
-                  <span>Current Balance</span>
+                  <span>Total Net Worth</span>
                   <DollarSign size={20} className="text-emerald-400" />
                 </div>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold tracking-tight">${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-4xl font-bold tracking-tight">{format(netWorth)}</span>
                   <div className={`flex items-center mt-2 text-sm ${balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {balance >= 0 ? <ArrowUpRight size={16} className="mr-1" /> : <ArrowDownRight size={16} className="mr-1" />}
-                    <span>{balance >= 0 ? '+' : ''}{totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : '0'}% savings rate</span>
+                    <span>Cash: {format(balance)} | Inv: {format(investmentValue)}</span>
                   </div>
                 </div>
               </div>
@@ -78,7 +107,7 @@ function Dashboard() {
                   <CreditCard size={20} className="text-rose-400" />
                 </div>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold tracking-tight">${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-4xl font-bold tracking-tight">{format(totalSpend)}</span>
                   <div className="flex items-center mt-2 text-rose-400 text-sm">
                     <span className="bg-rose-500/20 text-rose-300 font-medium px-2 py-0.5 rounded mr-2">Info</span>
                     <span>across {transactions.length} transactions</span>
@@ -114,9 +143,19 @@ function Dashboard() {
               </div>
               <div className="space-y-6">
                 <BudgetPanel />
+                <CurrencyConverter />
                 <div className="bg-neutral-900/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6">
-                  <h3 className="text-lg font-bold mb-2">Sync Bank App</h3>
-                  <PlaidLinkButton onSuccess={fetchTransactions} />
+                  <h3 className="text-lg font-bold mb-2">Linked Accounts</h3>
+                  <div className="space-y-3">
+                    <PlaidLinkButton onSuccess={fetchTransactions} />
+                    <button 
+                      onClick={loadDemoData} 
+                      disabled={loadingDemo}
+                      className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm font-medium transition-colors border border-white/10 disabled:opacity-50"
+                    >
+                      {loadingDemo ? 'Loading...' : 'Load Default Data'}
+                    </button>
+                  </div>
                 </div>
                 <ManualEntryForm onTransactionAdded={fetchTransactions} />
                 <CSVUpload onUploadComplete={fetchTransactions} />
@@ -154,7 +193,9 @@ function Dashboard() {
 function App() {
   return (
     <AuthProvider>
-      <Dashboard />
+      <CurrencyProvider>
+        <Dashboard />
+      </CurrencyProvider>
     </AuthProvider>
   );
 }

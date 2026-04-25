@@ -1,4 +1,5 @@
 import { useAuth } from './AuthContext';
+import { useCurrency, SUPPORTED_CURRENCIES } from './CurrencyContext';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,6 +17,7 @@ const tabs = [
 
 const Header = ({ activeTab, onTabChange }: HeaderProps) => {
     const { user, logout } = useAuth();
+    const { baseCurrency, setBaseCurrency } = useCurrency();
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
@@ -49,6 +51,18 @@ const Header = ({ activeTab, onTabChange }: HeaderProps) => {
                     {user && (
                         <span className="hidden md:inline text-xs text-neutral-500">{user.email}</span>
                     )}
+                    
+                    <select
+                        value={baseCurrency}
+                        onChange={(e) => setBaseCurrency(e.target.value)}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-medium text-white px-2.5 py-1.5 focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer appearance-none outline-none"
+                    >
+                        {SUPPORTED_CURRENCIES.map(c => (
+                            <option key={c.code} value={c.code} className="bg-neutral-900 text-white">
+                                {c.code} ({c.symbol})
+                            </option>
+                        ))}
+                    </select>
                     <button
                         onClick={logout}
                         className="hidden md:flex items-center gap-1.5 text-xs text-neutral-500 hover:text-rose-400 transition-colors px-3 py-2 rounded-lg hover:bg-rose-500/5"

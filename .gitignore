@@ -29,3 +29,6 @@ audit.log
 
 # pyright
 pyrightconfig.json
+
+# Firebase credentials
+finsight-afc8a-firebase-adminsdk-*.json

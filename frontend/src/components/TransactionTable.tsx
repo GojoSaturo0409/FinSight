@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useCurrency } from './CurrencyContext';
 
 const TransactionTable = ({ transactions, onRefresh }: { transactions: any[]; onRefresh?: () => void }) => {
+    const { format } = useCurrency();
     const [filter, setFilter] = useState('');
 
     const filtered = (transactions || []).filter((tx) => {
@@ -63,7 +65,7 @@ const TransactionTable = ({ transactions, onRefresh }: { transactions: any[]; on
                                     </td>
                                     <td className="py-4 text-sm text-neutral-400">{tx.date}</td>
                                     <td className={`py-4 text-sm font-bold text-right ${tx.category === 'Income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {tx.category === 'Income' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+                                        {tx.category === 'Income' ? '+' : '-'}{format(Math.abs(tx.amount))}
                                     </td>
                                 </tr>
                             ))

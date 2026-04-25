@@ -8,6 +8,7 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from services.shared.database import get_db
 from services.shared import models
+from services.auth_service.auth.router import get_current_user
 
 router = APIRouter()
 
@@ -55,19 +56,22 @@ def evaluate_budget(request: BudgetEvaluationRequest):
 
 
 @router.post("/evaluate-auto")
-def evaluate_budget_auto(db: Session = Depends(get_db)):
+def evaluate_budget_auto(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """
     Auto-evaluate: pulls transactions and budgets from DB, then runs the monitor.
     """
     # Get all transactions
-    txs = db.query(models.Transaction).all()
+    txs = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id).all()
     transaction_dicts = [
         {"category": tx.category, "amount": tx.amount}
         for tx in txs
     ]
 
     # Get all budgets
-    budgets_db = db.query(models.Budget).all()
+    budgets_db = db.query(models.Budget).filter(models.Budget.user_id == current_user.id).all()
     budgets = {b.category: b.limit_amount for b in budgets_db}
 
     if not budgets:
@@ -101,9 +105,12 @@ def get_recent_alerts(limit: int = 20):
 
 
 @router.get("/limits")
-def get_budget_limits(db: Session = Depends(get_db)):
+def get_budget_limits(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Get all budget limits from DB."""
-    budgets = db.query(models.Budget).all()
+    budgets = db.query(models.Budget).filter(models.Budget.user_id == current_user.id).all()
     return {
         "status": "success",
         "budgets": [
@@ -114,16 +121,22 @@ def get_budget_limits(db: Session = Depends(get_db)):
 
 
 @router.post("/limits")
-def set_budget_limit(request: BudgetLimitRequest, db: Session = Depends(get_db)):
+def set_budget_limit(
+    request: BudgetLimitRequest, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Create or update a budget limit for a category."""
     existing = db.query(models.Budget).filter(
-        models.Budget.category == request.category
+        models.Budget.category == request.category,
+        models.Budget.user_id == current_user.id
     ).first()
 
     if existing:
         existing.limit_amount = request.limit_amount
     else:
         new_budget = models.Budget(
+            user_id=current_user.id,
             category=request.category,
             limit_amount=request.limit_amount,
         )
@@ -134,16 +147,36 @@ def set_budget_limit(request: BudgetLimitRequest, db: Session = Depends(get_db))
 
 
 @router.get("/summary")
-def get_budget_summary(db: Session = Depends(get_db)):
+def get_budget_summary(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Get budget limits with actual spending from transactions."""
-    budgets = db.query(models.Budget).all()
-    txs = db.query(models.Transaction).all()
+    budgets = db.query(models.Budget).filter(models.Budget.user_id == current_user.id).all()
+    
+    if not budgets:
+        defaults = [
+            models.Budget(user_id=current_user.id, category="Food", limit_amount=500),
+            models.Budget(user_id=current_user.id, category="Housing", limit_amount=1500),
+            models.Budget(user_id=current_user.id, category="Transport", limit_amount=200),
+            models.Budget(user_id=current_user.id, category="Entertainment", limit_amount=150),
+            models.Budget(user_id=current_user.id, category="Shopping", limit_amount=250),
+        ]
+        db.add_all(defaults)
+        db.commit()
+        budgets = defaults
+    txs = db.query(models.Transaction).filter(models.Transaction.user_id == current_user.id).all()
 
-    # Aggregate spending by category
     category_spend: Dict[str, float] = {}
     for tx in txs:
         cat = tx.category or "Unknown"
         category_spend[cat] = category_spend.get(cat, 0) + tx.amount
+
+    # Deduplicate budgets by category
+    unique_budgets = {}
+    for b in budgets:
+        unique_budgets[b.category] = b
+    budgets = list(unique_budgets.values())
 
     summary = []
     for b in budgets:

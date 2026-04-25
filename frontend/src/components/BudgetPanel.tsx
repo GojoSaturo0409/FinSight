@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import { useCurrency } from './CurrencyContext';
 
 interface BudgetItem {
     category: string;
@@ -10,6 +11,7 @@ interface BudgetItem {
 }
 
 const BudgetPanel = () => {
+    const { format } = useCurrency();
     const [budgets, setBudgets] = useState<BudgetItem[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -78,19 +80,19 @@ const BudgetPanel = () => {
                         <div key={budget.category}>
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="font-medium text-neutral-300">{budget.category}</span>
-                                <span className="text-neutral-400">Limit: ${budget.limit.toLocaleString()}</span>
+                                <span className="text-neutral-400">Limit: {format(budget.limit)}</span>
                             </div>
                             <input
                                 type="range"
-                                min="50"
+                                min="5"
                                 max="3000"
-                                step="50"
+                                step="5"
                                 value={budget.limit}
                                 onChange={(e) => handleSliderChange(budget.category, Number(e.target.value))}
                                 className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                             />
                             <div className="flex justify-between text-xs text-neutral-500 mt-1.5">
-                                <span>Spent: ${budget.spent.toLocaleString()}</span>
+                                <span>Spent: {format(budget.spent)}</span>
                                 <span className={getTextColor(budget.status)}>
                                     {budget.ratio.toFixed(0)}% Used
                                 </span>

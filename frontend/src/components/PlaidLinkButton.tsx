@@ -30,6 +30,7 @@ const PlaidLinkButton = ({ onSuccess }: PlaidLinkButtonProps) => {
                 method: 'POST',
                 body: JSON.stringify({ public_token }),
             });
+            await apiFetch('/budget/evaluate-auto', { method: 'POST' });
             if (onSuccess) onSuccess();
         } catch (e) {
             console.error("Error exchanging public token:", e);
@@ -42,6 +43,17 @@ const PlaidLinkButton = ({ onSuccess }: PlaidLinkButtonProps) => {
     };
 
     const { open, ready } = usePlaidLink(config);
+
+    if (linkToken === 'link-sandbox-mock-12345') {
+        return (
+            <button
+                onClick={() => handleOnSuccess('mock-public-token-123')}
+                className="bg-indigo-600 hover:bg-indigo-700 w-full py-3 rounded-lg font-medium transition-colors border border-indigo-400/30"
+            >
+                Simulate Direct Bank Login
+            </button>
+        );
+    }
 
     if (linkToken) {
         return (

@@ -149,8 +149,15 @@ class OpenExchangeRatesHandler(BaseRateHandler):
 class RedisCachedRateHandler(BaseRateHandler):
     """
     Terminal handler: reads cached exchange rates from the Redis distribute cache.
-    Returns 1.0 as the absolute last fallback if no cache entry exists.
+    Falls back to static rates if no cache entry exists.
     """
+
+    # Realistic static fallback rates (as of early 2026, all relative to USD)
+    STATIC_RATES_TO_USD = {
+        "EUR": 0.92, "GBP": 0.79, "JPY": 149.50, "INR": 83.12,
+        "AUD": 1.53, "CAD": 1.36, "CHF": 0.88, "CNY": 7.24,
+        "BRL": 4.97, "MXN": 17.15, "USD": 1.0,
+    }
 
     def __init__(self, db_session=None):
         super().__init__()
@@ -179,12 +186,19 @@ class RedisCachedRateHandler(BaseRateHandler):
                     logger.info("RedisCachedRateHandler: Found reverse cached rate for %s = %f", pair, rate)
                     return rate
 
-            logger.warning("RedisCachedRateHandler: No cache entry for %s, returning 1.0", pair)
-            return 1.0
-
         except Exception as e:
             logger.error("RedisCachedRateHandler: Redis query failed: %s", str(e))
-            return 1.0
+
+        # Static fallback: use hardcoded rates
+        base_usd = self.STATIC_RATES_TO_USD.get(base_currency)
+        target_usd = self.STATIC_RATES_TO_USD.get(target_currency)
+        if base_usd and target_usd:
+            rate = target_usd / base_usd
+            logger.info("RedisCachedRateHandler: Static fallback %s -> %s = %f", base_currency, target_currency, rate)
+            return round(rate, 6)
+
+        logger.warning("RedisCachedRateHandler: No rate for %s -> %s, returning 1.0", base_currency, target_currency)
+        return 1.0
 
 
 # Alias for legacy test compatibility

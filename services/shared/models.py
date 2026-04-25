@@ -30,6 +30,16 @@ class Budget(Base):
     category = Column(String, nullable=False, index=True)
     limit_amount = Column(Float, nullable=False, default=500.0)
 
+class Investment(Base):
+    __tablename__ = "investments"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)
+    shares = Column(Float, nullable=False, default=0.0)
+    average_price = Column(Float, nullable=False, default=0.0)
+    last_updated = Column(DateTime, default=datetime.datetime.utcnow)
+
 class ExchangeRateCache(Base):
     __tablename__ = "exchange_rate_cache"
 

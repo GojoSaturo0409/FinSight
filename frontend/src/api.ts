@@ -16,8 +16,7 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const base = endpoint.startsWith('/ingestion') ? INGESTION_API_BASE : API_BASE;
-    const response = await fetch(`${base}${endpoint}`, {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
         headers,
     });

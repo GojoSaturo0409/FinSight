@@ -3,13 +3,30 @@ from typing import List, Dict, Any
 import datetime
 
 class PlaidAdapter(ITransactionSource):
-    def __init__(self, raw_data: List[Dict[str, Any]]):
+    def __init__(self, raw_data: Any):
         self.raw_data = raw_data
 
     def fetch_transactions(self) -> List[Dict[str, Any]]:
-        # Map Plaid's nested JSON to the internal format
         normalized = []
-        for item in self.raw_data:
+        txs = self.raw_data.get('transactions', []) if isinstance(self.raw_data, dict) else self.raw_data
+        accounts = self.raw_data.get('accounts', []) if isinstance(self.raw_data, dict) else []
+
+        # 1. Map Balances as initial Income
+        for acc in accounts:
+            bal = acc.get("balances", {}).get("current", 0)
+            if bal and bal > 0:
+                normalized.append({
+                    "id": str(acc.get("account_id", f"bal_{len(normalized)}")),
+                    "amount": float(bal),
+                    "currency": acc.get("balances", {}).get("iso_currency_code", "USD") or "USD",
+                    "category": "Income",
+                    "merchant": f"Starting Balance - {acc.get('name', 'Bank Account')}",
+                    "date": datetime.datetime.utcnow(),
+                    "source": "plaid_balance"
+                })
+
+        # 2. Map existing transactions
+        for item in txs:
             normalized.append({
                 "id": str(item.get("transaction_id", "")),
                 "amount": float(item.get("amount", 0)),

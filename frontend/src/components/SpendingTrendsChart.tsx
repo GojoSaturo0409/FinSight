@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { apiFetch } from '../api';
+import { useCurrency } from './CurrencyContext';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -19,6 +20,7 @@ interface SpendingTrendsProps {
 }
 
 const SpendingTrendsChart = ({ transactions = [] }: SpendingTrendsProps) => {
+    const { format } = useCurrency();
     const [chartData, setChartData] = useState<{ labels: string[]; values: number[] }>({
         labels: [],
         values: [],
@@ -64,7 +66,7 @@ const SpendingTrendsChart = ({ transactions = [] }: SpendingTrendsProps) => {
 
     const fetchSpendingTrends = async () => {
         try {
-            const data = await apiFetch('/ingestion/transactions/all?limit=200');
+            const data = await apiFetch('/ingestion/transactions?limit=200');
             const txs = data.data || [];
 
             const monthlyTotals: Record<string, number> = {};
@@ -147,7 +149,7 @@ const SpendingTrendsChart = ({ transactions = [] }: SpendingTrendsProps) => {
                 borderWidth: 1,
                 callbacks: {
                     label: function (context: any) {
-                        return `$${context.raw.toLocaleString()}`;
+                        return format(context.raw);
                     },
                 },
             },
@@ -161,7 +163,7 @@ const SpendingTrendsChart = ({ transactions = [] }: SpendingTrendsProps) => {
                 ticks: {
                     color: 'rgba(255, 255, 255, 0.5)',
                     callback: function (value: any) {
-                        return '$' + value.toLocaleString();
+                        return format(value);
                     },
                 },
             },

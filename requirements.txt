@@ -5,7 +5,7 @@ psycopg2-binary
 alembic
 pydantic
 python-dotenv
-jose
+python-jose
 pyjwt
 passlib
 bcrypt
@@ -18,3 +18,9 @@ scikit-learn
 numpy
 scipy
 pytest
+jinja2
+weasyprint
+plaid-python
+matplotlib
+mailjet-rest
+firebase-admin

@@ -37,7 +37,7 @@ const RecommendationsPanel = () => {
         }
 
         try {
-            const txData = await apiFetch('/ingestion/transactions/all');
+            const txData = await apiFetch('/ingestion/transactions');
             const transactions = txData.data || [];
 
             const categoryTotals: Record<string, number> = {};

@@ -75,7 +75,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             );
 
             if (res.ok) {
-                return await login(email, password);
+                const loginResult = await login(email, password);
+                if (loginResult.ok) {
+                    // Auto-seed Plaid sandbox data for the new user
+                    try {
+                        const seedToken = localStorage.getItem('finsight_token');
+                        if (seedToken) {
+                            await fetch(`${API_BASE}/ingestion/plaid/set_access_token`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${seedToken}`,
+                                },
+                                body: JSON.stringify({ public_token: 'mock-public-token' }),
+                            });
+                        }
+                    } catch {
+                        // Plaid seeding is best-effort; don't block registration
+                    }
+                }
+                return loginResult;
             } else {
                 const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
                 return { ok: false, error: err.detail || 'Registration failed' };

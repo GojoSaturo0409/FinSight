@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, Loader2, FileDown, Eye, RefreshCw } from 'lucide-react';
 import { apiFetch, API_BASE } from '../api';
+import { useCurrency } from './CurrencyContext';
 
 const ReportExport = () => {
+    const { format: formatCurrency } = useCurrency();
     const [format, setFormat] = useState<'html' | 'pdf'>('html');
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState<any>(null);
@@ -15,7 +17,7 @@ const ReportExport = () => {
 
     const buildReportData = async () => {
         try {
-            const txData = await apiFetch('/ingestion/transactions/all');
+            const txData = await apiFetch('/ingestion/transactions');
             const portData = await apiFetch('/investments/portfolio');
 
             let spending_chart: Record<string, number> = {};
@@ -153,13 +155,13 @@ const ReportExport = () => {
                         <div className="bg-neutral-900/50 rounded-xl p-3 text-center">
                             <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Income</div>
                             <div className="text-sm font-bold text-emerald-400 mt-1">
-                                ${reportData.income.toLocaleString()}
+                                {formatCurrency(reportData.income)}
                             </div>
                         </div>
                         <div className="bg-neutral-900/50 rounded-xl p-3 text-center">
                             <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Expenses</div>
                             <div className="text-sm font-bold text-rose-400 mt-1">
-                                ${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatCurrency(totalExpenses)}
                             </div>
                         </div>
                         <div className="bg-neutral-900/50 rounded-xl p-3 text-center">
@@ -235,11 +237,11 @@ const ReportExport = () => {
                             <h5 className="font-bold mb-2">Summary</h5>
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <span className="text-neutral-400">Income:</span>
-                                <span className="text-emerald-400">${preview.summary?.income}</span>
+                                <span className="text-emerald-400">{formatCurrency(preview.monthly_summary?.income || 0)}</span>
                                 <span className="text-neutral-400">Expenses:</span>
-                                <span className="text-rose-400">${preview.summary?.expenses}</span>
+                                <span className="text-rose-400">{formatCurrency(preview.monthly_summary?.expenses || 0)}</span>
                                 <span className="text-neutral-400">Savings:</span>
-                                <span className="text-indigo-400">${preview.summary?.savings}</span>
+                                <span className="text-indigo-400">{formatCurrency(preview.monthly_summary?.savings || 0)}</span>
                             </div>
                         </div>
                     </div>

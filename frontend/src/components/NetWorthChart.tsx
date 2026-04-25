@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { apiFetch } from '../api';
+import { useCurrency } from './CurrencyContext';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -19,6 +20,7 @@ interface NetWorthProps {
 }
 
 const NetWorthChart = ({ transactions = [] }: NetWorthProps) => {
+    const { format } = useCurrency();
     const [chartData, setChartData] = useState<{ labels: string[]; values: number[] }>({
         labels: [],
         values: [],
@@ -135,7 +137,7 @@ const NetWorthChart = ({ transactions = [] }: NetWorthProps) => {
                 borderWidth: 1,
                 callbacks: {
                     label: function (context: any) {
-                        return `$${context.raw.toLocaleString()}`;
+                        return format(context.raw);
                     },
                 },
             },
@@ -149,7 +151,7 @@ const NetWorthChart = ({ transactions = [] }: NetWorthProps) => {
                 ticks: {
                     color: 'rgba(255, 255, 255, 0.5)',
                     callback: function (value: any) {
-                        return '$' + value.toLocaleString();
+                        return format(value);
                     },
                 },
             },
@@ -166,7 +168,7 @@ const NetWorthChart = ({ transactions = [] }: NetWorthProps) => {
                 <h3 className="text-xl font-bold">Net Worth</h3>
                 <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-indigo-400">
-                        ${currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {format(currentValue)}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-md ${parseFloat(growthPct) >= 0
                         ? 'text-emerald-400 bg-emerald-500/10'

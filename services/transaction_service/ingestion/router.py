@@ -2,16 +2,14 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from typing import Dict, Any, List, Optional
 from .factory import TransactionFactory
 from sqlalchemy.orm import Session
-import sys
 import os
 import uuid
 import csv
 import io
 import datetime
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from currency_converter.chain import CurrencyConversionChain
-from auth.router import get_current_user
+from services.transaction_service.currency_converter.chain import CurrencyConversionChain
+from services.auth_service.auth.router import get_current_user
 from services.shared import models
 from services.shared.database import get_db
 from pydantic import BaseModel
@@ -130,46 +128,27 @@ def exchange_public_token(
 ):
     """Exchanges public_token for access_token and performs initial transaction sync."""
     try:
-        access_token = "mock-access-token"
-        
-        if os.getenv('PLAID_CLIENT_ID') and req.public_token != "mock-public-token":
-            exchange_request = ItemPublicTokenExchangeRequest(public_token=req.public_token)
-            exchange_response = client.item_public_token_exchange(exchange_request)
-            access_token = exchange_response['access_token']
-        else:
-            # We are using mock sandbox without keys, fake the initial sync
-            pass
+        if req.public_token == 'mock-public-token-123' or not os.getenv('PLAID_CLIENT_ID'):
+            # The user triggered the simulated flow because they lack Sandbox keys.
+            return {"status": "success", "count": 0, "access_token_saved": True, "message": "Mock login successful. Use 'Load Default Data' for simulation."}
+
+        exchange_request = ItemPublicTokenExchangeRequest(public_token=req.public_token)
+        exchange_response = client.item_public_token_exchange(exchange_request)
+        access_token = exchange_response['access_token']
 
         # Perform an initial sync from Plaid
-        all_transactions = []
-        
-        if os.getenv('PLAID_CLIENT_ID') and access_token != "mock-access-token":
-            sync_request = TransactionsSyncRequest(access_token=access_token)
-            sync_response = client.transactions_sync(sync_request)
-            all_transactions = sync_response['added']
-        else:
-            # Generate mock Plaid transaction format
-            all_transactions = [
-                {
-                    "transaction_id": str(uuid.uuid4()),
-                    "amount": 80.50,
-                    "iso_currency_code": "USD",
-                    "category": ["Food and Drink", "Restaurants"],
-                    "merchant_name": "Starbucks Sandbox",
-                    "date": datetime.datetime.utcnow().strftime("%Y-%m-%d")
-                },
-                {
-                    "transaction_id": str(uuid.uuid4()),
-                    "amount": 1200.00,
-                    "iso_currency_code": "USD",
-                    "category": ["Payment", "Rent"],
-                    "merchant_name": "Avalon Sandbox",
-                    "date": datetime.datetime.utcnow().strftime("%Y-%m-%d")
-                }
-            ]
+        sync_request = TransactionsSyncRequest(access_token=access_token)
+        sync_response = client.transactions_sync(sync_request)
+        all_transactions = sync_response['added']
+
+        # Get accounts info for balances
+        from plaid.model.accounts_get_request import AccountsGetRequest
+        accounts_request = AccountsGetRequest(access_token=access_token)
+        accounts_response = client.accounts_get(accounts_request)
+        all_accounts = accounts_response['accounts']
 
         # Use PlaidAdapter to normalize
-        parser = TransactionFactory.create_parser("plaid", all_transactions)
+        parser = TransactionFactory.create_parser("plaid", {"transactions": all_transactions, "accounts": all_accounts})
         parsed = parser.fetch_transactions()
 
         # Save to DB
@@ -190,11 +169,13 @@ def exchange_public_token(
                 category=tx.get("category", "Uncategorized"),
                 merchant=tx.get("merchant", "Unknown"),
                 date=tx.get("date", datetime.datetime.utcnow()),
-                source="plaid",
+                source=tx.get("source", "plaid"),
             )
-            db.add(db_tx)
-            saved.append(tx)
-            db_txs.append(db_tx)
+            existing = db.query(models.Transaction).filter_by(id=db_tx.id).first()
+            if not existing:
+                db.add(db_tx)
+                saved.append(tx)
+                db_txs.append(db_tx)
 
         db.commit()
         from .events import publish_transaction_ingested
@@ -248,6 +229,80 @@ def add_manual_transaction(
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/demo-data")
+def load_demo_data(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Loads a set of realistic 3-month demo transactions for testing."""
+    import uuid
+    from datetime import timedelta
+    
+    test_data = []
+    base_date = datetime.datetime.utcnow()
+    
+    # Generate 24 transactions distributed over the last 90 days
+    categories = ["Food", "Transport", "Entertainment", "Shopping", "Utilities"]
+    merchants = ["Whole Foods", "Uber", "Netflix", "Amazon", "ConEdison"]
+    amounts = [45.50, 12.00, 15.99, 120.00, 85.00]
+    
+    for i in range(24):
+        days_ago = (i * 3) + 1  # spread out over ~75 days
+        tx_date = base_date - timedelta(days=days_ago)
+        
+        # Add income every ~8 transactions (representing monthly salary)
+        if i % 8 == 0:
+            test_data.append({
+                "id": str(uuid.uuid4()),
+                "amount": 5000.00,
+                "currency": "USD",
+                "category": "Income",
+                "merchant": "TechCorp Salary",
+                "date": tx_date.isoformat(),
+                "source": "demo"
+            })
+        else:
+            idx = i % 5
+            test_data.append({
+                "id": str(uuid.uuid4()),
+                "amount": amounts[idx],
+                "currency": "USD",
+                "category": categories[idx],
+                "merchant": merchants[idx],
+                "date": tx_date.isoformat(),
+                "source": "demo"
+            })
+    
+    saved = []
+    db_txs = []
+    try:
+        for tx in test_data:
+            db_tx = models.Transaction(
+                id=tx["id"],
+                user_id=current_user.id,
+                amount=tx["amount"],
+                currency=tx["currency"],
+                category=tx["category"],
+                merchant=tx["merchant"],
+                date=datetime.datetime.fromisoformat(tx["date"].replace('Z', '+00:00')),
+                source=tx["source"],
+            )
+            # check if exists
+            existing = db.query(models.Transaction).filter_by(id=db_tx.id).first()
+            if not existing:
+                db.add(db_tx)
+                saved.append(tx)
+                db_txs.append(db_tx)
+        
+        db.commit()
+        from .events import publish_transaction_ingested
+        for db_tx in db_txs:
+            publish_transaction_ingested(db_tx)
+            
+        return {"status": "success", "count": len(saved), "message": "Demo data loaded."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/upload-csv")
 def upload_csv(

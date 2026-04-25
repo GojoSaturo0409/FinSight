@@ -37,3 +37,14 @@ def get_supported_info():
         ],
         "note": "If API keys are not set, the chain falls through to the DB cache.",
     }
+
+
+@router.get("/rates")
+def get_all_rates():
+    """Return all exchange rates relative to USD for the frontend global CurrencyContext."""
+    from .handlers import RedisCachedRateHandler
+    return {
+        "status": "success",
+        "base": "USD",
+        "rates": RedisCachedRateHandler.STATIC_RATES_TO_USD,
+    }

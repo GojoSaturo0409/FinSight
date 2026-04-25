@@ -39,8 +39,10 @@ class BudgetMonitor:
             "current_spend": current_spend,
             "alert_level": alert_level
         }
+        import os
+        rmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
         try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=5672))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=rmq_host, port=5672))
             channel = connection.channel()
             channel.exchange_declare(exchange='budget_events', exchange_type='fanout')
             channel.basic_publish(
