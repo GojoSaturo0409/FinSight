@@ -6,8 +6,8 @@ from .monitor import BudgetMonitor
 from .observers import EmailNotifier, InAppNotifier, LoggingObserver
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared.database import get_db
-import shared.models
+from services.shared.database import get_db
+from services.shared import models
 
 router = APIRouter()
 

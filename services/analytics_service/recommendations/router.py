@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from shared.database import get_db
+from services.shared.database import get_db
 from .chain import RecommendationChain
 
 router = APIRouter()
@@ -24,7 +24,7 @@ def generate_recommendations_auto(db: Session = Depends(get_db)):
     Auto-generate recommendations using real transaction data from DB.
     No frontend context required — everything computed server-side.
     """
-    from shared.models import Transaction, Budget
+    from services.shared.models import Transaction, Budget
     from sqlalchemy import func
 
     # Compute total spending

@@ -73,7 +73,7 @@ class AlphaVantageService:
         Otherwise fetch from Alpha Vantage API and update cache.
         On API failure, return stale cached data with stale=True flag.
         """
-        from shared.models import InvestmentCache
+        from services.shared.models import InvestmentCache
 
         cached = db.query(InvestmentCache).filter(InvestmentCache.symbol == symbol).first()
 

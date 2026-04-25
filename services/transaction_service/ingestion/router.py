@@ -12,8 +12,8 @@ import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from currency_converter.chain import CurrencyConversionChain
 from auth.router import get_current_user
-import shared.models
-from shared.database import get_db
+from services.shared import models
+from services.shared.database import get_db
 from pydantic import BaseModel
 import plaid
 from plaid.api import plaid_api

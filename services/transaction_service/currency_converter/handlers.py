@@ -187,6 +187,10 @@ class RedisCachedRateHandler(BaseRateHandler):
             return 1.0
 
 
+# Alias for legacy test compatibility
+DBCachedRateHandler = RedisCachedRateHandler
+
+
 def save_rate_to_cache(db_session, base_currency: str, target_currency: str, rate: float):
     """
     Persist a freshly fetched rate to Redis cache for future fallback.

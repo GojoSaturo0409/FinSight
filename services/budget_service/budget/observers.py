@@ -55,7 +55,7 @@ class EmailNotifier(AlertObserver):
         )
 
         # Fire and forget passing data to our Celery worker via RabbitMQ
-        from budget.tasks import send_email_alert
+        from .tasks import send_email_alert
         send_email_alert.delay(category, threshold, current_spend, alert_level)
         return {"delivered": True, "channel": "email", "detail": "Dispatched to Celery worker"}
 
@@ -80,7 +80,7 @@ class InAppNotifier(AlertObserver):
                 f"(limit: ${threshold:.2f})")
 
         # Fire async push notification task via Celery
-        from budget.tasks import send_push_notification
+        from .tasks import send_push_notification
         send_push_notification.delay(category, threshold, current_spend, alert_level)
         return {"delivered": True, "channel": "push", "detail": "Dispatched to Celery worker"}
 

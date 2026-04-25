@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
-from shared.database import get_db
+from services.shared.database import get_db
 from .builder import ReportBuilder
 import datetime
 
@@ -15,7 +15,7 @@ def _compute_net_worth_trend(db: Session) -> List[Dict[str, Any]]:
     Groups transactions by month, computes cumulative savings (income - expenses).
     Returns: [{"month": "Jan", "net_worth": 10500}, ...]
     """
-    from shared.models import Transaction
+    from services.shared.models import Transaction
     from sqlalchemy import func, extract
 
     try:
@@ -77,7 +77,7 @@ def _fallback_net_worth() -> List[Dict[str, Any]]:
 
 def _compute_spending_from_db(db: Session) -> Dict[str, float]:
     """Compute category spending from real transactions in DB."""
-    from shared.models import Transaction
+    from services.shared.models import Transaction
     from sqlalchemy import func
 
     try:
@@ -101,7 +101,7 @@ def _compute_spending_from_db(db: Session) -> Dict[str, float]:
 
 def _get_portfolio_from_db(db: Session) -> List[Dict[str, Any]]:
     """Get portfolio data from investment cache in DB."""
-    from shared.models import InvestmentCache
+    from services.shared.models import InvestmentCache
 
     try:
         entries = db.query(InvestmentCache).all()

@@ -24,5 +24,5 @@ def get_db():
 
 def create_tables():
     """Create all tables from models. Safe to call multiple times."""
-    import shared.models  # noqa: F401 — ensure all models are imported
+    from . import models  # noqa: F401 — ensure all models are imported
     Base.metadata.create_all(bind=engine)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from shared.database import get_db
+from services.shared.database import get_db
 from .alpha_vantage_service import AlphaVantageService, DEFAULT_SYMBOLS
 
 router = APIRouter()

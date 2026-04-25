@@ -3,9 +3,9 @@ import json
 import logging
 import traceback
 import time
-from shared.database import SessionLocal
-from categorization.service import get_default_service
-from budget.monitor import BudgetMonitor
+from services.shared.database import SessionLocal
+from services.transaction_service.categorization.service import get_default_service
+from services.budget_service.budget.monitor import BudgetMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ categorization_service = get_default_service()
 budget_monitor = BudgetMonitor()
 
 def process_transaction(tx_data):
-    import shared.models
+    from services.shared import models
     db = SessionLocal()
     try:
         cat_txs = categorization_service.process_transactions([tx_data])

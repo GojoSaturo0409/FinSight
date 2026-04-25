@@ -3,13 +3,13 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
-from shared.alembic import context
+from services.shared.alembic import context
 
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared.database import Base, SQLALCHEMY_DATABASE_URL
-import shared.models
+from services.shared.database import Base, SQLALCHEMY_DATABASE_URL
+from services.shared import models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

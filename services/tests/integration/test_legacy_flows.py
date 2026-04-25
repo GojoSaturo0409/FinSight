@@ -5,22 +5,27 @@ import os
 if "DATABASE_URL" not in os.environ:
     os.environ["DATABASE_URL"] = "sqlite:///test_temp.db"
 
-# Add backend dir to python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add microservice dirs to python path
+services_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(services_dir, "transaction_service"))
+sys.path.append(os.path.join(services_dir, "budget_service"))
+sys.path.append(os.path.join(services_dir, "analytics_service"))
+sys.path.append(os.path.join(services_dir, "auth_service"))
+sys.path.append(services_dir)
 
-from ingestion.factory import TransactionFactory
-from ingestion.adapters import PlaidAdapter, CSVAdapter
-from budget.monitor import BudgetMonitor
-from budget.observers import AlertObserver
-from recommendations.chain import RecommendationChain
-from recommendations.handlers import (
+from transaction_service.ingestion.factory import TransactionFactory
+from transaction_service.ingestion.adapters import PlaidAdapter, CSVAdapter
+from budget_service.budget.monitor import BudgetMonitor
+from budget_service.budget.observers import AlertObserver
+from analytics_service.recommendations.chain import RecommendationChain
+from analytics_service.recommendations.handlers import (
     HighSpendDetector, SubscriptionAuditHandler,
     SavingsGoalAdvisor, InvestmentOpportunityHandler
 )
-from reports.builder import ReportBuilder
-from core.security import create_access_token, verify_password, get_password_hash
+from analytics_service.reports.builder import ReportBuilder
+from shared.core.security import create_access_token, verify_password, get_password_hash
 from jose import jwt
-from core.security import SECRET_KEY, ALGORITHM
+from shared.core.security import SECRET_KEY, ALGORITHM
 
 class MockObserver(AlertObserver):
     def __init__(self):
@@ -290,7 +295,7 @@ def test_alpha_vantage_cache_fallback():
     Test that AlphaVantageService returns stale cached data when API fails.
     Uses a mock DB session to simulate cache without a real database.
     """
-    from investments.alpha_vantage_service import AlphaVantageService
+    from analytics_service.investments.alpha_vantage_service import AlphaVantageService
     import json
     import datetime
 
@@ -331,7 +336,7 @@ def test_alpha_vantage_cache_fallback():
 
 def test_alpha_vantage_cache_fresh():
     """Test that fresh cached data (<24h) is returned without API call."""
-    from investments.alpha_vantage_service import AlphaVantageService
+    from analytics_service.investments.alpha_vantage_service import AlphaVantageService
     import json
     import datetime
 
@@ -375,7 +380,7 @@ def test_alpha_vantage_cache_fresh():
 
 def test_rule_based_strategy_expanded():
     """Test that the expanded RuleBasedStrategy covers all major categories."""
-    from categorization.strategies import RuleBasedStrategy
+    from transaction_service.categorization.strategies import RuleBasedStrategy
     strategy = RuleBasedStrategy()
 
     test_cases = [
@@ -402,7 +407,7 @@ def test_rule_based_strategy_expanded():
 def test_ml_strategy_categorization():
     """Test that MLStrategy returns predictions (with ML suffix)."""
     try:
-        from categorization.strategies import MLStrategy
+        from transaction_service.categorization.strategies import MLStrategy
         strategy = MLStrategy()
 
         if not strategy._trained:
@@ -426,8 +431,8 @@ def test_ml_strategy_categorization():
 
 def test_strategy_switching():
     """Test that CategorizationService.set_strategy() changes behavior."""
-    from categorization.service import CategorizationService
-    from categorization.strategies import RuleBasedStrategy, MLStrategy
+    from transaction_service.categorization.service import CategorizationService
+    from transaction_service.categorization.strategies import RuleBasedStrategy, MLStrategy
 
     service = CategorizationService(strategy=RuleBasedStrategy())
     assert service.current_strategy_name == "RuleBasedStrategy"
@@ -453,7 +458,7 @@ def test_strategy_switching():
 def test_config_driven_strategy():
     """Test that env-var-driven default strategy selection works."""
     import os
-    from categorization.service import get_default_service
+    from transaction_service.categorization.service import get_default_service
 
     # Test default (rule)
     old_val = os.environ.get("CATEGORIZATION_STRATEGY", "")
@@ -479,7 +484,7 @@ def test_config_driven_strategy():
 
 def test_multi_threshold_alerts():
     """Test that BudgetMonitor fires alerts at 80%, 100%, and 120% thresholds."""
-    from budget.monitor import BudgetMonitor
+    from budget_service.budget.monitor import BudgetMonitor
     from unittest.mock import patch
     import json
 
@@ -515,7 +520,7 @@ def test_multi_threshold_alerts():
 
 def test_email_notifier_mailjet_mock():
     """Test EmailNotifier with mocked httpx (no real API call)."""
-    from budget.observers import EmailNotifier
+    from budget_service.budget.observers import EmailNotifier
 
     notifier = EmailNotifier()
     # Without API keys, it falls back to console print
@@ -528,7 +533,7 @@ def test_email_notifier_mailjet_mock():
 
 def test_push_notifier_firebase_mock():
     """Test InAppNotifier with mocked Firebase (no real API call)."""
-    from budget.observers import InAppNotifier
+    from budget_service.budget.observers import InAppNotifier
 
     notifier = InAppNotifier()
     # Without Firebase key, it falls back to console print
@@ -542,7 +547,7 @@ def test_push_notifier_firebase_mock():
 def test_logging_observer_audit():
     """Test LoggingObserver writes structured audit entries."""
     import tempfile, os
-    from budget.observers import LoggingObserver
+    from budget_service.budget.observers import LoggingObserver
 
     # Use a temp file for the audit log
     tmp_log = os.path.join(tempfile.gettempdir(), "test_audit.log")
@@ -563,7 +568,7 @@ def test_logging_observer_audit():
 
 def test_observer_detach():
     """Test that detaching an observer stops it from receiving alerts."""
-    from budget.monitor import BudgetMonitor
+    from budget_service.budget.monitor import BudgetMonitor
 
     monitor = BudgetMonitor()
     
@@ -577,7 +582,7 @@ def test_observer_detach():
 
 def test_currency_chain_primary_success():
     """Test that ExchangeRateAPIHandler succeeds when API key is set (mocked)."""
-    from currency_converter.handlers import ExchangeRateAPIHandler
+    from transaction_service.currency_converter.handlers import ExchangeRateAPIHandler
 
     handler = ExchangeRateAPIHandler()
     # Without API key configured, it will pass to next handler
@@ -590,7 +595,7 @@ def test_currency_chain_primary_success():
 
 def test_currency_chain_failover():
     """Test that the chain falls through handlers correctly."""
-    from currency_converter.handlers import (
+    from transaction_service.currency_converter.handlers import (
         ExchangeRateAPIHandler, OpenExchangeRatesHandler, DBCachedRateHandler
     )
 
@@ -611,7 +616,7 @@ def test_currency_chain_failover():
 
 def test_currency_chain_db_fallback():
     """Test DBCachedRateHandler with a mock DB session."""
-    from currency_converter.handlers import DBCachedRateHandler
+    from transaction_service.currency_converter.handlers import DBCachedRateHandler
 
     class MockCacheEntry:
         def __init__(self, rate):
@@ -642,7 +647,7 @@ def test_currency_chain_db_fallback():
 
 def test_same_currency_no_conversion():
     """Test that same-currency conversion returns the original amount."""
-    from currency_converter.chain import CurrencyConversionChain
+    from transaction_service.currency_converter.chain import CurrencyConversionChain
 
     chain = CurrencyConversionChain()
     result = chain.convert(100.0, "USD", "USD")
