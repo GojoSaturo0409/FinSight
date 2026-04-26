@@ -21,7 +21,7 @@ def process_transaction(tx_data):
         updated_category = cat_txs[0]["category"]
         
         db_tx = db.query(models.Transaction).filter_by(id=tx_data["id"]).first()
-        if db_tx and db_tx.category == "Uncategorized" and updated_category != "Uncategorized":
+        if db_tx and db_tx.category != updated_category:
             db_tx.category = updated_category
             db.commit()
 

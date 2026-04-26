@@ -36,7 +36,7 @@ class CategorizationService:
         """
         for tx in transactions:
             current_cat = tx.get("category", "")
-            if not current_cat or current_cat in ("Unknown", "Uncategorized"):
+            if not current_cat or current_cat in ("Unknown", "Uncategorized", "Miscellaneous"):
                 tx["category"] = self._strategy.categorize(tx)
         return transactions
 

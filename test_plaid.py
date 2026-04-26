@@ -3,7 +3,8 @@ import json
 import time
 
 # 1. Login to get our local access token
-login_res = requests.post("http://api_gateway/auth/login", data={"username": "test2@test.com", "password": "test123"})
+LOGIN_PAYLOAD = {"username": "test4@test.com", "password": "test123"}
+login_res = requests.post("http://api_gateway/auth/login", data=LOGIN_PAYLOAD)
 if login_res.status_code != 200:
     print("Login failed:", login_res.text)
     exit(1)

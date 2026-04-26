@@ -64,7 +64,6 @@
 | **Developer** | Modifiability, testability, clear service boundaries | Development | C2 Container Diagram, codebase structure |
 | **DevOps** | Deployability, containerization, monitoring | Deployment | Docker Compose topology, Nginx gateway |
 | **Security Auditor** | Data isolation, credential management, JWT security | Security | Auth flow, `.env` separation, `.gitignore` rules |
-| **Course Evaluator** | Correct application of SE patterns, working prototype | Logical | ADRs, UML diagrams, sequence diagrams |
 
 ### 2.2 Architecture Decision Records (ADRs)
 

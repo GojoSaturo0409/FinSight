@@ -25,6 +25,8 @@ class RuleBasedStrategy(CategorizationStrategy):
         self.rules: Dict[str, str] = {
             # Transport
             "uber": "Transport",
+            "united airlines": "Transport",
+            "united": "Transport",
             "lyft": "Transport",
             "ola": "Transport",
             "grab": "Transport",
@@ -36,7 +38,8 @@ class RuleBasedStrategy(CategorizationStrategy):
             "parking": "Transport",
 
             # Food & Dining
-            "mcdonalds": "Food",
+            "mcdonald": "Food",
+            "kfc": "Food",
             "starbucks": "Food",
             "dominos": "Food",
             "pizza": "Food",
@@ -98,8 +101,11 @@ class RuleBasedStrategy(CategorizationStrategy):
             "nike": "Shopping",
             "zara": "Shopping",
             "h&m": "Shopping",
+            "madison bicycle": "Shopping",
+            "tectra": "Shopping",
 
             # Entertainment
+            "fun": "Entertainment",
             "cinema": "Entertainment",
             "theater": "Entertainment",
             "concert": "Entertainment",
@@ -108,6 +114,7 @@ class RuleBasedStrategy(CategorizationStrategy):
             "playstation": "Entertainment",
             "xbox": "Entertainment",
             "arcade": "Entertainment",
+            "touchstone": "Entertainment",
 
             # Healthcare
             "pharmacy": "Healthcare",
@@ -134,10 +141,18 @@ class RuleBasedStrategy(CategorizationStrategy):
             "freelance": "Income",
             "dividend": "Income",
             "interest": "Income",
+            "gusto": "Income",
+            "cd deposit": "Income",
+            "intrst": "Income",
+            
+            # Transfer
+            "automatic payment": "Transfer",
+            "credit card 3333": "Transfer",
         }
 
     def categorize(self, transaction: Dict[str, Any]) -> str:
-        merchant = transaction.get("merchant", "").lower()
+        merchant = transaction.get("merchant")
+        merchant = (merchant or "").lower()
         for keyword, category in self.rules.items():
             if keyword in merchant:
                 return category
@@ -188,13 +203,14 @@ class MLStrategy(CategorizationStrategy):
             training_data: List[Tuple[str, str]] = [
                 # Transport
                 ("uber ride", "Transport"), ("lyft driver", "Transport"),
+                ("united airlines flight ticket", "Transport"),
                 ("taxi fare", "Transport"), ("gas station fuel", "Transport"),
                 ("metro transit", "Transport"), ("parking lot", "Transport"),
                 ("ola cab", "Transport"), ("shell petroleum", "Transport"),
 
                 # Food
                 ("mcdonalds burger", "Food"), ("starbucks coffee", "Food"),
-                ("dominos pizza delivery", "Food"), ("restaurant dining", "Food"),
+                ("kfc chicken", "Food"), ("restaurant dining", "Food"),
                 ("grubhub order", "Food"), ("doordash delivery", "Food"),
                 ("grocery store", "Food"), ("walmart supermarket", "Food"),
                 ("whole foods market", "Food"), ("trader joe organic", "Food"),
@@ -225,12 +241,14 @@ class MLStrategy(CategorizationStrategy):
                 ("target store", "Shopping"), ("costco wholesale", "Shopping"),
                 ("ikea furniture", "Shopping"), ("nike shoes", "Shopping"),
                 ("zara clothing", "Shopping"), ("flipkart online", "Shopping"),
+                ("madison bicycle shop", "Shopping"), ("tectra inc", "Shopping"),
 
                 # Entertainment
                 ("cinema movie ticket", "Entertainment"), ("concert ticket", "Entertainment"),
                 ("ticketmaster event", "Entertainment"), ("steam game", "Entertainment"),
                 ("playstation store", "Entertainment"), ("xbox live", "Entertainment"),
                 ("theater show", "Entertainment"), ("arcade gaming", "Entertainment"),
+                ("touchstone climbing", "Entertainment"),
 
                 # Healthcare
                 ("pharmacy prescription", "Healthcare"), ("hospital medical", "Healthcare"),
@@ -245,6 +263,12 @@ class MLStrategy(CategorizationStrategy):
                 # Income
                 ("salary payroll deposit", "Income"), ("freelance payment", "Income"),
                 ("dividend income", "Income"), ("interest earned", "Income"),
+                ("gusto payroll", "Income"), ("cd deposit initial", "Income"),
+                ("intrst pymnt", "Income"),
+
+                # Transfer
+                ("automatic payment thank", "Transfer"),
+                ("credit card 3333 payment", "Transfer"),
             ]
 
             merchants = [item[0] for item in training_data]
@@ -284,7 +308,7 @@ class MLStrategy(CategorizationStrategy):
         if not self._trained or self._model is None or self._vectorizer is None:
             return self._fallback.categorize(transaction)
 
-        merchant = transaction.get("merchant", "")
+        merchant = transaction.get("merchant")
         if not merchant:
             return self._fallback.categorize(transaction)
 
@@ -317,7 +341,8 @@ class MLStrategy(CategorizationStrategy):
             return
 
         try:
-            X = self._vectorizer.transform([merchant.lower()])
+            merch_str = merchant or ""
+            X = self._vectorizer.transform([merch_str.lower()])
             # partial_fit updates weights incrementally in Naive Bayes
             self._model.partial_fit(X, [correct_category], classes=self._model.classes_)
             

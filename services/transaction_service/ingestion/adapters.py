@@ -32,7 +32,7 @@ class PlaidAdapter(ITransactionSource):
                 "amount": float(item.get("amount", 0)),
                 "currency": item.get("iso_currency_code", "USD"),
                 "category": item.get("category", ["Unknown"])[0] if isinstance(item.get("category"), list) else "Unknown",
-                "merchant": item.get("merchant_name", "Unknown"),
+                "merchant": item.get("merchant_name") or item.get("name", "Unknown"),
                 "date": item.get("date") if isinstance(item.get("date"), (datetime.date, datetime.datetime)) else datetime.datetime.strptime(item.get("date", "2000-01-01"), "%Y-%m-%d"),
                 "source": "plaid"
             })
